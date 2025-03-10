@@ -1,1 +1,2 @@
-# SO2-Projekt-Problem-Dw-ch-Filozof-w
+#SO2-Projekt-Dining-Philosophers-Problem
+
