@@ -1,2 +1,2 @@
-#SO2-Projekt-Dining-Philosophers-Problem
+# SO2-Projekt-Dining-Philosophers-Problem
 
