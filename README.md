@@ -1,2 +1,1 @@
-# SO2-Projekt-Dining-Philosophers-Problem
-
+### Projekty Teoria Systemów Daniel Turek
