@@ -47,39 +47,39 @@ public:
 
     // Function to pick up forks
     void pick_up_forks(int id) {
-        unique_lock<mutex> lock(forks[id]);
+        unique_lock<mutex> lock(forks[id]); // Lock the mutex for the left fork
         state[id] = HUNGRY;
         update_output(id, "HUNGRY", "\033[1;33m"); // Yellow color for hungry
 
         // Try to acquire both forks
         test(id);
         if (state[id] != EATING) {
-            conditions[id].wait(lock);
+            conditions[id].wait(lock); // Wait until the philosopher can eat
         }
     }
 
     // Function to put down forks
     void put_down_forks(int id) {
-        unique_lock<mutex> lock(forks[id]);
+        unique_lock<mutex> lock(forks[id]); // Lock the mutex for the left fork
         state[id] = THINKING;
         update_output(id, "puts down forks", "\033[1;31m"); // Red color for putting down forks
 
         // Notify neighbors
-        test((id + num_philosophers - 1) % num_philosophers);
-        test((id + 1) % num_philosophers);
+        test((id + num_philosophers - 1) % num_philosophers); // Test the left neighbor
+        test((id + 1) % num_philosophers); // Test the right neighbor
     }
 
     // Function to test if a philosopher can eat
     void test(int id) {
         if (state[id] == HUNGRY && state[(id + num_philosophers - 1) % num_philosophers] != EATING && state[(id + 1) % num_philosophers] != EATING) {
             state[id] = EATING;
-            conditions[id].notify_one();
+            conditions[id].notify_one(); // Notify the philosopher that they can eat
         }
     }
 
     // Function to update the output with the current state of a philosopher
     void update_output(int id, const string& action, const string& color) {
-        unique_lock<mutex> lock(output_mutex);
+        unique_lock<mutex> lock(output_mutex); // Lock the mutex for synchronized output
         auto now = chrono::system_clock::now();
         auto now_c = chrono::system_clock::to_time_t(now);
         cout << "\033[" << (id + 1) << ";1H" << color << "Philosopher " << id << " is " 
