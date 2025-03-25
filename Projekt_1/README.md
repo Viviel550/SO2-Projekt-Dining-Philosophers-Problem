@@ -1,28 +1,65 @@
-# Dining Philosophers Problem
+# Problem Jedzących Filozofów (Dining Philosophers Problem)
 
-This project is an implementation of the Dining Philosophers Problem, created as a school project with the goal of understanding the basics of multithreading.
+## Opis problemu
+Problem ucztujących filozofów jest klasycznym problemem synchronizacji w informatyce. Pięciu filozofów siedzi przy okrągłym stole, na którym znajduje się pięć widelców. Każdy filozof na przemian myśli i je. Aby jeść, filozof musi mieć dwa widelce - jeden z lewej i jeden z prawej strony. Problem polega na tym, aby zapewnić, że żaden filozof nie będzie głodny na zawsze (brak zakleszczeń) i że filozofowie będą mogli jeść, gdy tylko będą mieli na to ochotę (brak zagłodzenia).
 
-## Description
+## Wymagania
+- C++ 11+
+- Terminal obsługujący kody wyjścia ANSI dla kolorowych wyników 
 
-The Dining Philosophers Problem is a classic synchronization problem that illustrates the challenges of avoiding deadlock and ensuring proper synchronization in a concurrent system. In this problem, a number of philosophers sit around a table, each with a fork on either side. To eat, a philosopher needs to pick up both forks. Philosophers alternate between thinking and eating, and they must avoid deadlock by properly synchronizing their actions.
+## Instrukcje uruchomienia projektu
+1. Pobierz repozytorium lub sklonuj
+2. Skompiluj projekt:
+    ```sh
+    g++ -std=c++11 -o dining_philosophers main.cpp -lpthread
+    ```
+2. Uruchom skompilowany program:
+    ```sh
+    ./dining_philosophers
+    ```
+3. Podaj liczbę filozofów, gdy zostaniesz o to poproszony.
 
-## Features
+## Wątki i co reprezentują
+- **Philosopher Threads**: Każdy filozof jest reprezentowany przez osobny wątek. Wątek ten wykonuje cyklicznie trzy czynności: myślenie, podnoszenie widelców i jedzenie.
 
-- Each philosopher reports their state (THINKING, HUNGRY, EATING) in the terminal.
-- The program ensures that there is no deadlock.
-- The number of philosophers is provided as input at the start of the program.
-- The output is color-coded for better readability:
-  - THINKING: Blue
-  - HUNGRY: Yellow
-  - EATING: Green
-  - Putting down forks: Red
+## Sekcje krytyczne i ich rozwiązanie
+- **Sekcja krytyczna**: Podnoszenie i odkładanie widelców przez filozofów.
+- **Rozwiązanie**: Użycie mutexów i zmiennych warunkowych do synchronizacji dostępu do widelców. Każdy widelec jest chroniony przez mutex, a zmienne warunkowe są używane do powiadamiania filozofów, gdy mogą podnieść widelce i zacząć jeść.
 
-## Requirements
+### Kod odpowiedzialny za sekcje krytyczne
+```cpp
+// Funkcja podnosząca widelce
+void pick_up_forks(int id) {
+    unique_lock<mutex> lock(forks[id]);
+    state[id] = HUNGRY;
+    update_output(id, "HUNGRY", "\033[1;33m"); // Żółty kolor dla głodnego
 
-- C++11 or later
-- A terminal that supports ANSI escape codes for colored output
+    // Próba zdobycia obu widelców
+    test(id);
+    if (state[id] != EATING) {
+        conditions[id].wait(lock);
+    }
+}
 
-## Usage
+// Funkcja odkładająca widelce
+void put_down_forks(int id) {
+    unique_lock<mutex> lock(forks[id]);
+    state[id] = THINKING;
+    update_output(id, "puts down forks", "\033[1;31m"); // Czerwony kolor dla odkładania widelców
 
-1. Clone the repository or download the source code.
-2. Compile the code using a C++ compiler (e.g., `g++`):
+    // Powiadomienie sąsiadów
+    test((id + num_philosophers - 1) % num_philosophers);
+    test((id + 1) % num_philosophers);
+}
+
+// Funkcja testująca, czy filozof może jeść
+void test(int id) {
+    if (state[id] == HUNGRY && state[(id + num_philosophers - 1) % num_philosophers] != EATING && state[(id + 1) % num_philosophers] != EATING) {
+        state[id] = EATING;
+        conditions[id].notify_one();
+    }
+}
+```
+
+## Autor
+- Daniel Turek
