@@ -66,6 +66,7 @@ public:
         // Notify neighbors
         test((id + num_philosophers - 1) % num_philosophers); // Test the left neighbor
         test((id + 1) % num_philosophers); // Test the right neighbor
+        this_thread::sleep_for(chrono::milliseconds(1000 + rand() % 2000));
     }
 
     // Function to test if a philosopher can eat
