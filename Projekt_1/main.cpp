@@ -64,8 +64,8 @@ public:
         state[id] = THINKING;
         update_output(id, "puts down forks", "\033[1;31m"); // Red color for putting down forks
         // Notify neighbors
-        test((id + num_philosophers - 1) % num_philosophers);
-        test((id + 1) % num_philosophers);
+        test((id + num_philosophers - 1) % num_philosophers); // Test the left neighbor
+        test((id + 1) % num_philosophers); // Test the right neighbor
     }
 
     // Function to test if a philosopher can eat
