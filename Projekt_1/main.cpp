@@ -14,6 +14,7 @@ enum State { THINKING, HUNGRY, EATING };
 class DiningPhilosophers {
 private:
     int num_philosophers; // Number of philosophers
+    int loops; // Number of loops for each philosopher
     vector<State> state; // State of each philosopher
     vector<mutex> forks; // Mutex for each fork
     vector<condition_variable> conditions; // Condition variable for each philosopher
@@ -21,11 +22,11 @@ private:
 
 public:
     // Constructor to initialize the number of philosophers and their states
-    DiningPhilosophers(int n) : num_philosophers(n), state(n, THINKING), forks(n), conditions(n) {}
+    DiningPhilosophers(int n, int l) : num_philosophers(n), loops(l), state(n, THINKING), forks(n), conditions(n) {}
 
     // Function representing the actions of a philosopher
     void philosopher(int id) {
-        while (true) {
+        for (int i = 0; i < loops; ++i) { // Repeat actions for the specified number of loops
             think(id);
             pick_up_forks(id);
             eat(id);
@@ -50,7 +51,6 @@ public:
         unique_lock<mutex> lock(forks[id]);
         state[id] = HUNGRY;
         update_output(id, "HUNGRY", "\033[1;33m"); // Yellow color for hungry
-
         // Try to acquire both forks
         test(id);
         if (state[id] != EATING) {
@@ -63,10 +63,10 @@ public:
         unique_lock<mutex> lock(forks[id]);
         state[id] = THINKING;
         update_output(id, "puts down forks", "\033[1;31m"); // Red color for putting down forks
-
         // Notify neighbors
         test((id + num_philosophers - 1) % num_philosophers);
         test((id + 1) % num_philosophers);
+        this_thread::sleep_for(chrono::milliseconds(1000 + rand() % 2000));
     }
 
     // Function to test if a philosopher can eat
@@ -88,19 +88,22 @@ public:
 };
 
 int main() {
-    int num_philosophers;
+    int num_philosophers, loops;
     cout << "\nEnter the number of philosophers: ";
     cin >> num_philosophers;
+    cout << "\nEnter the number of loops: ";
+    cin >> loops;
 
-    if (num_philosophers <= 0) {
-        cerr << "The number of philosophers must be greater than 0." << endl;
+    if (num_philosophers <= 0 || loops <= 0) {
+        cerr << "The number of philosophers and loops must be greater than 0." << endl;
         return 1;
     }
 
     // Clear the screen and hide the cursor
     cout << "\033[2J\033[?25l";
 
-    DiningPhilosophers table(num_philosophers);
+    // Create the DiningPhilosophers object with the specified number of philosophers and loops
+    DiningPhilosophers table(num_philosophers, loops);
     vector<thread> philosophers;
 
     // Create a thread for each philosopher
