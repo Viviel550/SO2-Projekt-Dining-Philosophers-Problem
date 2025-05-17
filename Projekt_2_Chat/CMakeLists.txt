@@ -1,26 +1,21 @@
 cmake_minimum_required(VERSION 3.10)
-project(TerminalChat)
+project(ChatApp)
 
 set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Use pkg-config to find libpqxx
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(PQXX REQUIRED libpqxx)
-
-# Create directory structure if it doesn't exist
-file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Chatfiles/Register)
-
-# Add the executable
-add_executable(chat
-    main.cpp
-    Chatfiles/Register/register.cpp
-    Chatfiles/Register/registerback.cpp
-)
+# Find PostgreSQL and libpqxx
+find_package(PostgreSQL REQUIRED)
+find_path(PQXX_INCLUDE_DIR pqxx/pqxx)
+find_library(PQXX_LIBRARY pqxx)
 
 # Include directories
-include_directories(${PQXX_INCLUDE_DIRS})
-include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+include_directories(${PostgreSQL_INCLUDE_DIRS} ${PQXX_INCLUDE_DIR})
 
-# Link the libraries
-target_link_libraries(chat PRIVATE ${PQXX_LIBRARIES})
+# Source files
+file(GLOB_RECURSE SOURCES "*.cpp")
+
+# Create executable
+add_executable(chat_app ${SOURCES})
+
+# Link libraries
+target_link_libraries(chat_app ${PostgreSQL_LIBRARIES} ${PQXX_LIBRARY})

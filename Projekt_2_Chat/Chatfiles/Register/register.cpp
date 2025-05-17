@@ -1,10 +1,11 @@
 #include "register.h"
 #include "registerback.h"
 #include <iostream>
+#include <limits>
 #include <string>
 
 void showRegisterScreen() {
-    std::string username, password, confirmPassword;
+    std::string username, password, confirmPassword, email;
     
     std::cout << "\033[2J"; // Clear screen
     std::cout << "\033[1;36m"; // Cyan color
@@ -12,9 +13,10 @@ void showRegisterScreen() {
     
     std::cout << "Enter username: ";
     std::cin >> username;
-    
+    std::cout << "Enter email: ";
+    std::cin >> email;
     // Check if username already exists
-    if (checkUsernameExists(username)) {
+    if (checkEmailExists(email)) {
         std::cout << "\033[1;31m"; // Red color
         std::cout << "Username already exists. Please choose another one.\n";
         std::cout << "\033[0m"; // Reset color
@@ -35,7 +37,7 @@ void showRegisterScreen() {
     }
     
     // Call the backend function to register user
-    if (registerUser(username, password)) {
+    if (registerUser(username, password, email)) {
         std::cout << "\033[1;32m"; // Green color
         std::cout << "Registration successful!\n";
         std::cout << "\033[0m"; // Reset color
@@ -47,6 +49,6 @@ void showRegisterScreen() {
     
     // Wait for user to press enter
     std::cout << "\nPress Enter to continue...";
-    std::cin.ignore();
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
     std::cin.get();
 }

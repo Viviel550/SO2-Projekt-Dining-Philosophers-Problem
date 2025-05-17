@@ -3,7 +3,7 @@
 
 #include <string>
 
-bool checkUsernameExists(const std::string& username);
-bool registerUser(const std::string& username, const std::string& password);
+bool checkEmailExists(const std::string& username);
+bool registerUser(const std::string& username, const std::string& password, const std::string& email);
 
 #endif

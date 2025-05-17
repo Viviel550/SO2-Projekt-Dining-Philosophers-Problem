@@ -3,12 +3,13 @@
 #include <pqxx/pqxx>
 #include <string>
 #include <random>
+#include "../Config.h" 
 
 // Database connection string
-const std::string CONNECTION_STRING = "dbname=Chat user=postgres password=123 hostaddr=127.0.0.1 port=5432";
+const std::string CONNECTION_STRING = DBConfig::getConnectionString();
 
 // Check if a username already exists in the database
-bool checkUsernameExists(const std::string& username) {
+bool checkEmailExists(const std::string& email) {
     try {
         pqxx::connection conn(CONNECTION_STRING);
         
@@ -20,8 +21,8 @@ bool checkUsernameExists(const std::string& username) {
         pqxx::work txn(conn);
         
         pqxx::result res = txn.exec_params(
-            "SELECT COUNT(*) FROM users WHERE user_name = $1",
-            username
+            "SELECT COUNT(*) FROM users WHERE email = $1",
+            email
         );
         
         int count = res[0][0].as<int>();
@@ -38,7 +39,7 @@ bool checkUsernameExists(const std::string& username) {
 
 // Generate a unique user_name_id (numeric suffix)
 std::string generateUserNameId(const std::string& username) {
-    // Create a random number generator
+    // Create a random number generator, come back in the future to make sure generated id is unique for the user
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_int_distribution<> distrib(1000, 9999);
@@ -48,7 +49,7 @@ std::string generateUserNameId(const std::string& username) {
 }
 
 // Register a new user in the database
-bool registerUser(const std::string& username, const std::string& password) {
+bool registerUser(const std::string& username, const std::string& password, const std::string& email) {
     try {
         pqxx::connection conn(CONNECTION_STRING);
         
@@ -62,10 +63,11 @@ bool registerUser(const std::string& username, const std::string& password) {
         pqxx::work txn(conn);
         
         txn.exec_params(
-            "INSERT INTO users (user_name, user_name_id, password) VALUES ($1, $2, $3)",
+            "INSERT INTO users (user_name, user_name_id, password, email) VALUES ($1, $2, $3, $4)",
             username,
             userNameId,
-            password  // Note: In a real app, you should hash passwords!
+            password,
+            email  
         );
         
         txn.commit();

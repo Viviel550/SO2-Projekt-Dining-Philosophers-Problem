@@ -28,7 +28,7 @@ Aplikacja czatu terminalowego umożliwia komunikację tekstową pomiędzy użytk
     ```
 3. Skompiluj projekt:
     ```sh
-    g++ -std=c++11 -o chat_app main.cpp Chatfiles/Register/register.cpp Chatfiles/Register/registerback.cpp Chatfiles/Login/login.cpp Chatfiles/Login/loginback.cpp Chatfiles/MainTerminal/mainterminal.cpp Chatfiles/MainTerminal/mainterminalback.cpp Chatfiles/ChatTerminal/chatterminal.cpp Chatfiles/ChatTerminal/chatterminalback.cpp -lpqxx -lpq
+    g++ -std=c++17 main.cpp Chatfiles/Login/*.cpp Chatfiles/Register/*.cpp Chatfiles/MainTerminal/*.cpp Chatfiles/ChatTerminal/*.cpp -o chat_app.exe -lpqxx -lpq
     ```
 4. Uruchom program:
     ```sh
