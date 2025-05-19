@@ -11,8 +11,18 @@ find_library(PQXX_LIBRARY pqxx)
 # Include directories
 include_directories(${PostgreSQL_INCLUDE_DIRS} ${PQXX_INCLUDE_DIR})
 
-# Source files
-file(GLOB_RECURSE SOURCES "*.cpp")
+# Source files - explicitly list them instead of using GLOB
+set(SOURCES
+    main.cpp
+    Chatfiles/Login/login.cpp
+    Chatfiles/Login/loginback.cpp
+    Chatfiles/Register/register.cpp
+    Chatfiles/Register/registerback.cpp
+    Chatfiles/MainTerminal/mainterminal.cpp
+    Chatfiles/MainTerminal/mainterminalback.cpp
+    Chatfiles/ChatTerminal/chatterminal.cpp
+    Chatfiles/ChatTerminal/chatterminalback.cpp
+)
 
 # Create executable
 add_executable(chat_app ${SOURCES})

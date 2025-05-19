@@ -6,10 +6,9 @@
 #include "../Config.h" 
 
 // Database connection string
-const std::string CONNECTION_STRING = DBConfig::getConnectionString();
-
 // Check if a username already exists in the database
 bool checkEmailExists(const std::string& email) {
+    std::string CONNECTION_STRING = DBConfig::getConnectionString();
     try {
         pqxx::connection conn(CONNECTION_STRING);
         
@@ -20,9 +19,9 @@ bool checkEmailExists(const std::string& email) {
         
         pqxx::work txn(conn);
         
-        pqxx::result res = txn.exec_params(
+        pqxx::result res = txn.exec(
             "SELECT COUNT(*) FROM users WHERE email = $1",
-            email
+            pqxx::params(email)
         );
         
         int count = res[0][0].as<int>();
@@ -50,6 +49,7 @@ std::string generateUserNameId(const std::string& username) {
 
 // Register a new user in the database
 bool registerUser(const std::string& username, const std::string& password, const std::string& email) {
+    std::string CONNECTION_STRING = DBConfig::getConnectionString();
     try {
         pqxx::connection conn(CONNECTION_STRING);
         
@@ -62,12 +62,9 @@ bool registerUser(const std::string& username, const std::string& password, cons
         
         pqxx::work txn(conn);
         
-        txn.exec_params(
+        txn.exec(
             "INSERT INTO users (user_name, user_name_id, password, email) VALUES ($1, $2, $3, $4)",
-            username,
-            userNameId,
-            password,
-            email  
+            pqxx::params(username, userNameId, password, email)
         );
         
         txn.commit();

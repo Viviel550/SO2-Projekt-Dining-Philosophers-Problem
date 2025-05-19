@@ -4,10 +4,9 @@
 #include <string>
 #include "../Config.h"
 
-const std::string CONNECTION_STRING = DBConfig::getConnectionString();
-
-// Authenticate user with email and password
+// Authnticate user with email and password
 bool authenticateUser(const std::string& email, const std::string& password) {
+    std::string CONNECTION_STRING = DBConfig::getConnectionString();
     try {
         pqxx::connection conn(CONNECTION_STRING);
         
@@ -19,10 +18,9 @@ bool authenticateUser(const std::string& email, const std::string& password) {
         pqxx::work txn(conn);
         
         // Check if email and password match
-        pqxx::result res = txn.exec_params(
+        pqxx::result res = txn.exec(
             "SELECT COUNT(*) FROM users WHERE email = $1 AND password = $2",
-            email,
-            password  // Note: In a real app, you should hash passwords!
+            pqxx::params(email, password)
         );
         
         int count = res[0][0].as<int>();
@@ -38,34 +36,34 @@ bool authenticateUser(const std::string& email, const std::string& password) {
 }
 
 // Get user ID by email
-int getUserIdByEmail(const std::string& email) {
+UserData getUserIdByEmail(const std::string& email) {
+    std::string CONNECTION_STRING = DBConfig::getConnectionString();
+    UserData User = {-1, -1, ""}; // Default values for userId and userNameId
     try {
         pqxx::connection conn(CONNECTION_STRING);
         
         if (!conn.is_open()) {
             std::cerr << "Failed to open database connection\n";
-            return -1;
+            return User;
         }
         
         pqxx::work txn(conn);
         
-        pqxx::result res = txn.exec_params(
-            "SELECT user_id FROM users WHERE email = $1",
-            email
+        pqxx::result res = txn.exec(
+            "SELECT user_id, user_name_id, user_name FROM users WHERE email = $1",
+            pqxx::params(email)
         );
         
         if (res.empty()) {
-            return -1; // User not found
+            return User; // User not found
         }
         
-        int userId = res[0][0].as<int>();
-        
+        User.UserId = res[0][0].as<int>();
+        User.userNameId = res[0][1].as<int>();
+        User.userName = res[0][2].as<std::string>();
         txn.commit();
-        
-        return userId;
-    }
-    catch (const std::exception& e) {
+    } catch (const std::exception& e) {
         std::cerr << "Database error: " << e.what() << std::endl;
-        return -1;
     }
+    return User;
 }

@@ -4,10 +4,9 @@
 #include <string>
 #include <vector>
 #include "../Config.h"
-// Database connection string
-const std::string CONNECTION_STRING = DBConfig::getConnectionString();
 
 bool sendMessage(int senderId, int receiverId, const std::string& content) {
+    std::string CONNECTION_STRING = DBConfig::getConnectionString();
     try {
         pqxx::connection conn(CONNECTION_STRING);
         
@@ -18,16 +17,13 @@ bool sendMessage(int senderId, int receiverId, const std::string& content) {
         
         pqxx::work txn(conn);
         
-        txn.exec_params(
+        txn.exec(
             "INSERT INTO user_chat (sender_id, receiver_id, content) "
             "VALUES ($1, $2, $3)",
-            senderId,
-            receiverId,
-            content
+            pqxx::params(senderId, receiverId, content)
         );
         
         txn.commit();
-        
         return true;
     }
     catch (const std::exception& e) {
@@ -37,8 +33,8 @@ bool sendMessage(int senderId, int receiverId, const std::string& content) {
 }
 
 std::vector<Message> getChatHistory(int userId, int otherUserId, int limit) {
+    std::string CONNECTION_STRING = DBConfig::getConnectionString();
     std::vector<Message> messages;
-    
     try {
         pqxx::connection conn(CONNECTION_STRING);
         
@@ -49,17 +45,14 @@ std::vector<Message> getChatHistory(int userId, int otherUserId, int limit) {
         
         pqxx::work txn(conn);
         
-        // Get messages between the two users (in both directions)
-        pqxx::result res = txn.exec_params(
+        pqxx::result res = txn.exec(
             "SELECT sender_id, receiver_id, content, send_date "
             "FROM user_chat "
             "WHERE (sender_id = $1 AND receiver_id = $2) "
             "   OR (sender_id = $2 AND receiver_id = $1) "
             "ORDER BY send_date DESC "
             "LIMIT $3",
-            userId,
-            otherUserId,
-            limit
+            pqxx::params(userId, otherUserId, limit)
         );
         
         for (const auto& row : res) {

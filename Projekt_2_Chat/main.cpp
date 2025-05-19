@@ -13,10 +13,10 @@ using namespace std;
 int main(){
     int choice = 0;
     while(choice != 3){
-            cout<<"\033[2J\033[?25l"; // Clear the screen and hide the cursor
-            cout << "\033[1;34m"; // Set text color to blue
-            cout << "1. Login\n2. Register\n3. Exit\n";
-            cout<<"What operation you wish to perform?\n";
+        cout<<"\033[2J\033[H"; // Clear the screen and hide the cursor
+        cout << "\033[1;34m"; // Set text color to blue
+        cout << "1. Login\n2. Register\n3. Exit\n";
+        cout<<"What operation you wish to perform? : ";
         cin >> choice;
         switch(choice){
             case 1:

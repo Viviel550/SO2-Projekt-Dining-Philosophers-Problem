@@ -1,5 +1,6 @@
 #ifndef CHATTERMINALBACK_H
 #define CHATTERMINALBACK_H
+
 #include <string>
 #include <vector>
 
@@ -9,12 +10,18 @@ struct Message {
     int receiverId;
     std::string content;
     std::string timestamp;
+    bool operator==(const Message& other) const {
+        return senderId == other.senderId &&
+               receiverId == other.receiverId &&
+               content == other.content &&
+               timestamp == other.timestamp;
+    }
 };
 
 // Send a message from one user to another
 bool sendMessage(int senderId, int receiverId, const std::string& content);
 
 // Get chat history between two users
-std::vector<Message> getChatHistory(int userId, int otherUserId, int limit = 20);
+std::vector<Message> getChatHistory(int userId, int otherUserId, int limit = 30);
 
 #endif // CHATTERMINALBACK_H
