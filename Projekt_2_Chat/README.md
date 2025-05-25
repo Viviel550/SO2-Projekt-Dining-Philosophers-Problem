@@ -28,8 +28,9 @@ Aplikacja czatu terminalowego umożliwia komunikację tekstową pomiędzy użytk
     ```
 3. Skompiluj projekt:
     1. **Bezpośrednio**
+       - **Windows (MSYS2/MinGW):**
         ```sh
-        g++ -std=c++17 main.cpp Chatfiles/Login/*.cpp Chatfiles/Register/*.cpp Chatfiles/MainTerminal/*.cpp Chatfiles/ChatTerminal/*.cpp -o chat_app.exe -lpqxx -lpq
+        g++ -std=c++17 main.cpp Chatfiles/Login/*.cpp Chatfiles/Register/*.cpp Chatfiles/MainTerminal/*.cpp Chatfiles/ChatTerminal/*.cpp -o chat_app.exe -lpqxx -lpq -lncursesw
         ```
     2. **Przy użyciu CMakeList z generatorem Ninja**
         ```sh

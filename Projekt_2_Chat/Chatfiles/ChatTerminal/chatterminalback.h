@@ -22,6 +22,8 @@ struct Message {
 bool sendMessage(int senderId, int receiverId, const std::string& content);
 
 // Get chat history between two users
-std::vector<Message> getChatHistory(int userId, int otherUserId, int limit = 30);
+std::vector<Message> getChatHistory(int userId, int otherUserId, int limit);
+std::vector<Message> getOlderChatHistory(int userId, int otherUserId, int limit, int offset);
+std::vector<Message> getLatestChatHistory(int userId, int otherUserId, int limit);
 
 #endif // CHATTERMINALBACK_H
