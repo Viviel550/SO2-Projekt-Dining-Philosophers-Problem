@@ -1,0 +1,802 @@
+--
+-- PostgreSQL database dump
+--
+
+-- Dumped from database version 17.2
+-- Dumped by pg_dump version 17.2
+
+-- Started on 2025-05-26 01:16:30
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET transaction_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+SET default_tablespace = '';
+
+SET default_table_access_method = heap;
+
+--
+-- TOC entry 230 (class 1259 OID 25153)
+-- Name: friends; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.friends (
+    id integer NOT NULL,
+    user_1 integer NOT NULL,
+    user_2 integer NOT NULL,
+    accepted boolean DEFAULT false NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    accepted_at timestamp without time zone,
+    CONSTRAINT friends_check CHECK ((user_1 < user_2))
+);
+
+
+ALTER TABLE public.friends OWNER TO postgres;
+
+--
+-- TOC entry 229 (class 1259 OID 25152)
+-- Name: friends_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.friends_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.friends_id_seq OWNER TO postgres;
+
+--
+-- TOC entry 4920 (class 0 OID 0)
+-- Dependencies: 229
+-- Name: friends_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.friends_id_seq OWNED BY public.friends.id;
+
+
+--
+-- TOC entry 220 (class 1259 OID 25001)
+-- Name: user_chat; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.user_chat (
+    log_id integer NOT NULL,
+    sender_id integer,
+    receiver_id integer,
+    content text,
+    send_date timestamp with time zone DEFAULT now() NOT NULL
+)
+PARTITION BY RANGE (send_date);
+
+
+ALTER TABLE public.user_chat OWNER TO postgres;
+
+--
+-- TOC entry 219 (class 1259 OID 25000)
+-- Name: user_chat_log_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.user_chat_log_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.user_chat_log_id_seq OWNER TO postgres;
+
+--
+-- TOC entry 4921 (class 0 OID 0)
+-- Dependencies: 219
+-- Name: user_chat_log_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.user_chat_log_id_seq OWNED BY public.user_chat.log_id;
+
+
+--
+-- TOC entry 221 (class 1259 OID 25018)
+-- Name: user_chat_y2025m05; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.user_chat_y2025m05 (
+    log_id integer DEFAULT nextval('public.user_chat_log_id_seq'::regclass) NOT NULL,
+    sender_id integer,
+    receiver_id integer,
+    content text,
+    send_date timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.user_chat_y2025m05 OWNER TO postgres;
+
+--
+-- TOC entry 222 (class 1259 OID 25033)
+-- Name: user_chat_y2025m06; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.user_chat_y2025m06 (
+    log_id integer DEFAULT nextval('public.user_chat_log_id_seq'::regclass) NOT NULL,
+    sender_id integer,
+    receiver_id integer,
+    content text,
+    send_date timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.user_chat_y2025m06 OWNER TO postgres;
+
+--
+-- TOC entry 223 (class 1259 OID 25048)
+-- Name: user_chat_y2025m07; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.user_chat_y2025m07 (
+    log_id integer DEFAULT nextval('public.user_chat_log_id_seq'::regclass) NOT NULL,
+    sender_id integer,
+    receiver_id integer,
+    content text,
+    send_date timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.user_chat_y2025m07 OWNER TO postgres;
+
+--
+-- TOC entry 224 (class 1259 OID 25063)
+-- Name: user_chat_y2025m08; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.user_chat_y2025m08 (
+    log_id integer DEFAULT nextval('public.user_chat_log_id_seq'::regclass) NOT NULL,
+    sender_id integer,
+    receiver_id integer,
+    content text,
+    send_date timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.user_chat_y2025m08 OWNER TO postgres;
+
+--
+-- TOC entry 225 (class 1259 OID 25078)
+-- Name: user_chat_y2025m09; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.user_chat_y2025m09 (
+    log_id integer DEFAULT nextval('public.user_chat_log_id_seq'::regclass) NOT NULL,
+    sender_id integer,
+    receiver_id integer,
+    content text,
+    send_date timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.user_chat_y2025m09 OWNER TO postgres;
+
+--
+-- TOC entry 226 (class 1259 OID 25093)
+-- Name: user_chat_y2025m10; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.user_chat_y2025m10 (
+    log_id integer DEFAULT nextval('public.user_chat_log_id_seq'::regclass) NOT NULL,
+    sender_id integer,
+    receiver_id integer,
+    content text,
+    send_date timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.user_chat_y2025m10 OWNER TO postgres;
+
+--
+-- TOC entry 227 (class 1259 OID 25108)
+-- Name: user_chat_y2025m11; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.user_chat_y2025m11 (
+    log_id integer DEFAULT nextval('public.user_chat_log_id_seq'::regclass) NOT NULL,
+    sender_id integer,
+    receiver_id integer,
+    content text,
+    send_date timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.user_chat_y2025m11 OWNER TO postgres;
+
+--
+-- TOC entry 228 (class 1259 OID 25123)
+-- Name: user_chat_y2025m12; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.user_chat_y2025m12 (
+    log_id integer DEFAULT nextval('public.user_chat_log_id_seq'::regclass) NOT NULL,
+    sender_id integer,
+    receiver_id integer,
+    content text,
+    send_date timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.user_chat_y2025m12 OWNER TO postgres;
+
+--
+-- TOC entry 218 (class 1259 OID 24974)
+-- Name: users; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.users (
+    user_id integer NOT NULL,
+    user_name character varying(64) NOT NULL,
+    user_name_id integer NOT NULL,
+    password text NOT NULL,
+    email text NOT NULL
+);
+
+
+ALTER TABLE public.users OWNER TO postgres;
+
+--
+-- TOC entry 217 (class 1259 OID 24973)
+-- Name: users_user_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.users_user_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.users_user_id_seq OWNER TO postgres;
+
+--
+-- TOC entry 4922 (class 0 OID 0)
+-- Dependencies: 217
+-- Name: users_user_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.users_user_id_seq OWNED BY public.users.user_id;
+
+
+--
+-- TOC entry 4683 (class 0 OID 0)
+-- Name: user_chat_y2025m05; Type: TABLE ATTACH; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.user_chat ATTACH PARTITION public.user_chat_y2025m05 FOR VALUES FROM ('2025-05-01 00:00:00+00') TO ('2025-06-01 00:00:00+00');
+
+
+--
+-- TOC entry 4684 (class 0 OID 0)
+-- Name: user_chat_y2025m06; Type: TABLE ATTACH; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.user_chat ATTACH PARTITION public.user_chat_y2025m06 FOR VALUES FROM ('2025-06-01 00:00:00+00') TO ('2025-07-01 00:00:00+00');
+
+
+--
+-- TOC entry 4685 (class 0 OID 0)
+-- Name: user_chat_y2025m07; Type: TABLE ATTACH; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.user_chat ATTACH PARTITION public.user_chat_y2025m07 FOR VALUES FROM ('2025-07-01 00:00:00+00') TO ('2025-08-01 00:00:00+00');
+
+
+--
+-- TOC entry 4686 (class 0 OID 0)
+-- Name: user_chat_y2025m08; Type: TABLE ATTACH; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.user_chat ATTACH PARTITION public.user_chat_y2025m08 FOR VALUES FROM ('2025-08-01 00:00:00+00') TO ('2025-09-01 00:00:00+00');
+
+
+--
+-- TOC entry 4687 (class 0 OID 0)
+-- Name: user_chat_y2025m09; Type: TABLE ATTACH; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.user_chat ATTACH PARTITION public.user_chat_y2025m09 FOR VALUES FROM ('2025-09-01 00:00:00+00') TO ('2025-10-01 00:00:00+00');
+
+
+--
+-- TOC entry 4688 (class 0 OID 0)
+-- Name: user_chat_y2025m10; Type: TABLE ATTACH; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.user_chat ATTACH PARTITION public.user_chat_y2025m10 FOR VALUES FROM ('2025-10-01 00:00:00+00') TO ('2025-11-01 00:00:00+00');
+
+
+--
+-- TOC entry 4689 (class 0 OID 0)
+-- Name: user_chat_y2025m11; Type: TABLE ATTACH; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.user_chat ATTACH PARTITION public.user_chat_y2025m11 FOR VALUES FROM ('2025-11-01 00:00:00+00') TO ('2025-12-01 00:00:00+00');
+
+
+--
+-- TOC entry 4690 (class 0 OID 0)
+-- Name: user_chat_y2025m12; Type: TABLE ATTACH; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.user_chat ATTACH PARTITION public.user_chat_y2025m12 FOR VALUES FROM ('2025-12-01 00:00:00+00') TO ('2026-01-01 00:00:00+00');
+
+
+--
+-- TOC entry 4710 (class 2604 OID 25156)
+-- Name: friends id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.friends ALTER COLUMN id SET DEFAULT nextval('public.friends_id_seq'::regclass);
+
+
+--
+-- TOC entry 4692 (class 2604 OID 25004)
+-- Name: user_chat log_id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.user_chat ALTER COLUMN log_id SET DEFAULT nextval('public.user_chat_log_id_seq'::regclass);
+
+
+--
+-- TOC entry 4691 (class 2604 OID 24977)
+-- Name: users user_id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.users ALTER COLUMN user_id SET DEFAULT nextval('public.users_user_id_seq'::regclass);
+
+
+--
+-- TOC entry 4914 (class 0 OID 25153)
+-- Dependencies: 230
+-- Data for Name: friends; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.friends (id, user_1, user_2, accepted, created_at, accepted_at) FROM stdin;
+2	1	3	t	2025-05-25 23:14:19.55335	\N
+\.
+
+
+--
+-- TOC entry 4905 (class 0 OID 25018)
+-- Dependencies: 221
+-- Data for Name: user_chat_y2025m05; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.user_chat_y2025m05 (log_id, sender_id, receiver_id, content, send_date) FROM stdin;
+1	1	3	NiggeNigger	2025-05-19 16:46:27.749837+00
+2	1	3	test	2025-05-19 16:47:13.781586+00
+3	1	3	test	2025-05-19 16:49:26.766922+00
+4	1	3	t	2025-05-19 16:49:27.590202+00
+5	1	3	Limit	2025-05-19 16:49:33.094242+00
+6	1	3	jest	2025-05-19 16:49:35.823263+00
+7	1	3	20	2025-05-19 16:49:38.504574+00
+8	1	3	nie	2025-05-19 16:49:42.581278+00
+9	1	3	momoze	2025-05-19 16:49:50.629215+00
+10	1	3	test	2025-05-19 16:49:52.390416+00
+11	1	3	tetest	2025-05-19 16:49:56.46079+00
+12	1	3	dasd	2025-05-19 16:50:01.250925+00
+13	1	3	dasd	2025-05-19 16:50:02.613849+00
+14	1	3	test 33	2025-05-19 16:56:29.243263+00
+15	3	1	dsajesdsadas	2025-05-19 17:00:26.262405+00
+16	3	1	/exitg	2025-05-19 17:01:19.4085+00
+17	3	1	//exit	2025-05-19 17:01:24.069104+00
+18	3	4	a	2025-05-19 17:01:55.832613+00
+19	3	4	test2	2025-05-19 17:02:04.450176+00
+20	1	3	Limit zdan	2025-05-19 17:06:28.310734+00
+21	1	3	test tfasddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd	2025-05-19 17:06:43.410277+00
+22	1	3	Lmao	2025-05-19 17:09:25.766147+00
+23	1	3	test	2025-05-19 17:11:59.166924+00
+24	3	1	test	2025-05-19 17:12:06.027443+00
+25	1	3	tt	2025-05-19 17:14:27.754632+00
+26	1	3	test423341246754	2025-05-19 17:14:44.984379+00
+27	1	3	t	2025-05-19 17:14:50.304809+00
+28	1	3	Test4	2025-05-25 19:50:10.764699+00
+29	3	1	test	2025-05-25 19:51:16.437183+00
+30	3	1	TEst nowego okna	2025-05-25 19:51:25.912681+00
+31	3	1	test355	2025-05-25 19:51:34.281791+00
+32	1	3	test	2025-05-25 19:54:58.009441+00
+33	1	3	test78923	2025-05-25 19:56:58.546619+00
+34	1	3	Jak	2025-05-25 20:01:14.978014+00
+35	3	1	tak	2025-05-25 20:01:50.535175+00
+36	3	1	Delay	2025-05-25 20:02:10.367154+00
+37	1	3	tesssss	2025-05-25 20:02:22.635969+00
+38	3	1	testnowegosystemu	2025-05-25 20:04:49.546867+00
+39	1	3	test nowego system 2.0	2025-05-25 20:12:42.485068+00
+40	5	3	test22	2025-05-25 20:20:10.977941+00
+\.
+
+
+--
+-- TOC entry 4906 (class 0 OID 25033)
+-- Dependencies: 222
+-- Data for Name: user_chat_y2025m06; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.user_chat_y2025m06 (log_id, sender_id, receiver_id, content, send_date) FROM stdin;
+\.
+
+
+--
+-- TOC entry 4907 (class 0 OID 25048)
+-- Dependencies: 223
+-- Data for Name: user_chat_y2025m07; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.user_chat_y2025m07 (log_id, sender_id, receiver_id, content, send_date) FROM stdin;
+\.
+
+
+--
+-- TOC entry 4908 (class 0 OID 25063)
+-- Dependencies: 224
+-- Data for Name: user_chat_y2025m08; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.user_chat_y2025m08 (log_id, sender_id, receiver_id, content, send_date) FROM stdin;
+\.
+
+
+--
+-- TOC entry 4909 (class 0 OID 25078)
+-- Dependencies: 225
+-- Data for Name: user_chat_y2025m09; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.user_chat_y2025m09 (log_id, sender_id, receiver_id, content, send_date) FROM stdin;
+\.
+
+
+--
+-- TOC entry 4910 (class 0 OID 25093)
+-- Dependencies: 226
+-- Data for Name: user_chat_y2025m10; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.user_chat_y2025m10 (log_id, sender_id, receiver_id, content, send_date) FROM stdin;
+\.
+
+
+--
+-- TOC entry 4911 (class 0 OID 25108)
+-- Dependencies: 227
+-- Data for Name: user_chat_y2025m11; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.user_chat_y2025m11 (log_id, sender_id, receiver_id, content, send_date) FROM stdin;
+\.
+
+
+--
+-- TOC entry 4912 (class 0 OID 25123)
+-- Dependencies: 228
+-- Data for Name: user_chat_y2025m12; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.user_chat_y2025m12 (log_id, sender_id, receiver_id, content, send_date) FROM stdin;
+\.
+
+
+--
+-- TOC entry 4903 (class 0 OID 24974)
+-- Dependencies: 218
+-- Data for Name: users; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.users (user_id, user_name, user_name_id, password, email) FROM stdin;
+1	test	7691	test	test@pp.eu
+3	Brazil	4940	haslo	BrazilNo1@email.com
+4	Test3	9817	haslo1	test3@email.com
+5	TestNc	7276	test1	test2
+\.
+
+
+--
+-- TOC entry 4923 (class 0 OID 0)
+-- Dependencies: 229
+-- Name: friends_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.friends_id_seq', 2, true);
+
+
+--
+-- TOC entry 4924 (class 0 OID 0)
+-- Dependencies: 219
+-- Name: user_chat_log_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.user_chat_log_id_seq', 40, true);
+
+
+--
+-- TOC entry 4925 (class 0 OID 0)
+-- Dependencies: 217
+-- Name: users_user_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.users_user_id_seq', 5, true);
+
+
+--
+-- TOC entry 4737 (class 2606 OID 25161)
+-- Name: friends friends_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.friends
+    ADD CONSTRAINT friends_pkey PRIMARY KEY (id);
+
+
+--
+-- TOC entry 4739 (class 2606 OID 25163)
+-- Name: friends friends_user_1_user_2_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.friends
+    ADD CONSTRAINT friends_user_1_user_2_key UNIQUE (user_1, user_2);
+
+
+--
+-- TOC entry 4719 (class 2606 OID 25007)
+-- Name: user_chat user_chat_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.user_chat
+    ADD CONSTRAINT user_chat_pkey PRIMARY KEY (log_id, send_date);
+
+
+--
+-- TOC entry 4721 (class 2606 OID 25024)
+-- Name: user_chat_y2025m05 user_chat_y2025m05_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.user_chat_y2025m05
+    ADD CONSTRAINT user_chat_y2025m05_pkey PRIMARY KEY (log_id, send_date);
+
+
+--
+-- TOC entry 4723 (class 2606 OID 25039)
+-- Name: user_chat_y2025m06 user_chat_y2025m06_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.user_chat_y2025m06
+    ADD CONSTRAINT user_chat_y2025m06_pkey PRIMARY KEY (log_id, send_date);
+
+
+--
+-- TOC entry 4725 (class 2606 OID 25054)
+-- Name: user_chat_y2025m07 user_chat_y2025m07_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.user_chat_y2025m07
+    ADD CONSTRAINT user_chat_y2025m07_pkey PRIMARY KEY (log_id, send_date);
+
+
+--
+-- TOC entry 4727 (class 2606 OID 25069)
+-- Name: user_chat_y2025m08 user_chat_y2025m08_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.user_chat_y2025m08
+    ADD CONSTRAINT user_chat_y2025m08_pkey PRIMARY KEY (log_id, send_date);
+
+
+--
+-- TOC entry 4729 (class 2606 OID 25084)
+-- Name: user_chat_y2025m09 user_chat_y2025m09_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.user_chat_y2025m09
+    ADD CONSTRAINT user_chat_y2025m09_pkey PRIMARY KEY (log_id, send_date);
+
+
+--
+-- TOC entry 4731 (class 2606 OID 25099)
+-- Name: user_chat_y2025m10 user_chat_y2025m10_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.user_chat_y2025m10
+    ADD CONSTRAINT user_chat_y2025m10_pkey PRIMARY KEY (log_id, send_date);
+
+
+--
+-- TOC entry 4733 (class 2606 OID 25114)
+-- Name: user_chat_y2025m11 user_chat_y2025m11_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.user_chat_y2025m11
+    ADD CONSTRAINT user_chat_y2025m11_pkey PRIMARY KEY (log_id, send_date);
+
+
+--
+-- TOC entry 4735 (class 2606 OID 25129)
+-- Name: user_chat_y2025m12 user_chat_y2025m12_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.user_chat_y2025m12
+    ADD CONSTRAINT user_chat_y2025m12_pkey PRIMARY KEY (log_id, send_date);
+
+
+--
+-- TOC entry 4715 (class 2606 OID 25139)
+-- Name: users users_email_unique; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_email_unique UNIQUE (email);
+
+
+--
+-- TOC entry 4717 (class 2606 OID 24981)
+-- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_pkey PRIMARY KEY (user_id);
+
+
+--
+-- TOC entry 4740 (class 1259 OID 25176)
+-- Name: idx_friends_accepted; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_friends_accepted ON public.friends USING btree (accepted);
+
+
+--
+-- TOC entry 4741 (class 1259 OID 25174)
+-- Name: idx_friends_user_1; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_friends_user_1 ON public.friends USING btree (user_1);
+
+
+--
+-- TOC entry 4742 (class 1259 OID 25177)
+-- Name: idx_friends_user_1_accepted; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_friends_user_1_accepted ON public.friends USING btree (user_1, accepted);
+
+
+--
+-- TOC entry 4743 (class 1259 OID 25175)
+-- Name: idx_friends_user_2; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_friends_user_2 ON public.friends USING btree (user_2);
+
+
+--
+-- TOC entry 4744 (class 1259 OID 25178)
+-- Name: idx_friends_user_2_accepted; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_friends_user_2_accepted ON public.friends USING btree (user_2, accepted);
+
+
+--
+-- TOC entry 4745 (class 0 OID 0)
+-- Name: user_chat_y2025m05_pkey; Type: INDEX ATTACH; Schema: public; Owner: postgres
+--
+
+ALTER INDEX public.user_chat_pkey ATTACH PARTITION public.user_chat_y2025m05_pkey;
+
+
+--
+-- TOC entry 4746 (class 0 OID 0)
+-- Name: user_chat_y2025m06_pkey; Type: INDEX ATTACH; Schema: public; Owner: postgres
+--
+
+ALTER INDEX public.user_chat_pkey ATTACH PARTITION public.user_chat_y2025m06_pkey;
+
+
+--
+-- TOC entry 4747 (class 0 OID 0)
+-- Name: user_chat_y2025m07_pkey; Type: INDEX ATTACH; Schema: public; Owner: postgres
+--
+
+ALTER INDEX public.user_chat_pkey ATTACH PARTITION public.user_chat_y2025m07_pkey;
+
+
+--
+-- TOC entry 4748 (class 0 OID 0)
+-- Name: user_chat_y2025m08_pkey; Type: INDEX ATTACH; Schema: public; Owner: postgres
+--
+
+ALTER INDEX public.user_chat_pkey ATTACH PARTITION public.user_chat_y2025m08_pkey;
+
+
+--
+-- TOC entry 4749 (class 0 OID 0)
+-- Name: user_chat_y2025m09_pkey; Type: INDEX ATTACH; Schema: public; Owner: postgres
+--
+
+ALTER INDEX public.user_chat_pkey ATTACH PARTITION public.user_chat_y2025m09_pkey;
+
+
+--
+-- TOC entry 4750 (class 0 OID 0)
+-- Name: user_chat_y2025m10_pkey; Type: INDEX ATTACH; Schema: public; Owner: postgres
+--
+
+ALTER INDEX public.user_chat_pkey ATTACH PARTITION public.user_chat_y2025m10_pkey;
+
+
+--
+-- TOC entry 4751 (class 0 OID 0)
+-- Name: user_chat_y2025m11_pkey; Type: INDEX ATTACH; Schema: public; Owner: postgres
+--
+
+ALTER INDEX public.user_chat_pkey ATTACH PARTITION public.user_chat_y2025m11_pkey;
+
+
+--
+-- TOC entry 4752 (class 0 OID 0)
+-- Name: user_chat_y2025m12_pkey; Type: INDEX ATTACH; Schema: public; Owner: postgres
+--
+
+ALTER INDEX public.user_chat_pkey ATTACH PARTITION public.user_chat_y2025m12_pkey;
+
+
+--
+-- TOC entry 4755 (class 2606 OID 25164)
+-- Name: friends friends_user_1_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.friends
+    ADD CONSTRAINT friends_user_1_fkey FOREIGN KEY (user_1) REFERENCES public.users(user_id) ON DELETE CASCADE;
+
+
+--
+-- TOC entry 4756 (class 2606 OID 25169)
+-- Name: friends friends_user_2_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.friends
+    ADD CONSTRAINT friends_user_2_fkey FOREIGN KEY (user_2) REFERENCES public.users(user_id) ON DELETE CASCADE;
+
+
+--
+-- TOC entry 4753 (class 2606 OID 25013)
+-- Name: user_chat user_chat_receiver_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.user_chat
+    ADD CONSTRAINT user_chat_receiver_id_fkey FOREIGN KEY (receiver_id) REFERENCES public.users(user_id);
+
+
+--
+-- TOC entry 4754 (class 2606 OID 25008)
+-- Name: user_chat user_chat_sender_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.user_chat
+    ADD CONSTRAINT user_chat_sender_id_fkey FOREIGN KEY (sender_id) REFERENCES public.users(user_id);
+
+
+-- Completed on 2025-05-26 01:16:30
+
+--
+-- PostgreSQL database dump complete
+--
+
