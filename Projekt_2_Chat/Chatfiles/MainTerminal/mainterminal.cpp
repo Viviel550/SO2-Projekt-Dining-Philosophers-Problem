@@ -5,6 +5,7 @@
 #include <string>
 #include <limits>
 #include "../ChatTerminal/chatterminalf.h" 
+#include "../FriendList/friendlist.h"
 
 void initializeMainTerminal() {
     initscr();
@@ -218,9 +219,18 @@ static int JoinChatRoom() {
     return 0;
 }
 
-static int FriendsList() {
+static int FriendsList(const int userId, const std::string& userName) {
     clearMainTerminalMessageArea();
-    showMainTerminalMessage("Friends list not implemented yet.", 4); // Yellow color
+    
+    // Cleanup main terminal before starting friends list
+    cleanupMainTerminal();
+    
+    // Show friends list screen
+    showFriendsListScreen(userId, userName);
+    
+    // Reinitialize main terminal when returning
+    initializeMainTerminal();
+    
     return 0;
 }
 
@@ -279,7 +289,7 @@ int showMainTerminal(const std::string& userEmail, const std::string& userNameId
                         break;
                         
                     case 2: // Friends List
-                        FriendsList();
+                        FriendsList(userId, Name);
                         break;
                         
                     case 3: // Logout
