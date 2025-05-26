@@ -8,26 +8,51 @@
 #include "friendlistback.h"
 #include <ncurses/ncurses.h>
 #include "../ChatTerminal/chatterminalf.h"
+#include "../Database/AsyncQueryManager.h"
 
 static std::atomic<bool> messageCheckRunning{false};
 static std::thread messageCheckThread;
+static std::unique_ptr<AsyncQueryManager> queryManager;
 
+void initializeAsyncManager() {
+    if (!queryManager) {
+        queryManager = std::make_unique<AsyncQueryManager>(4);
+    }
+}
 
-void checkForNewMessages(int userId, std::vector<FriendInfo>* friends, std::atomic<bool>* needsRefresh) {
+void checkForNewMessagesOptimized(int userId, std::vector<FriendInfo>* friends, std::atomic<bool>* needsRefresh) {
     while (messageCheckRunning) {
-        if (friends && needsRefresh) {
-            // Update each friend's new message status
-            for (auto& friend_info : *friends) {
-                bool hasNew = hasNewMessagesFrom(userId, friend_info.userId);
-                if (hasNew != friend_info.hasNewMessages) {
-                    friend_info.hasNewMessages = hasNew;
-                    needsRefresh->store(true);
+        if (friends && needsRefresh && !friends->empty()) {
+            // Batch check for new messages from all friends
+            std::vector<std::future<bool>> futures;
+            
+            for (size_t i = 0; i < friends->size(); ++i) {
+                futures.push_back(
+                    queryManager->hasNewMessagesFromAsync(userId, (*friends)[i].userId)
+                );
+            }
+            
+            // Collect results
+            bool anyChanges = false;
+            for (size_t i = 0; i < futures.size() && i < friends->size(); ++i) {
+                try {
+                    bool hasNew = futures[i].get();
+                    if (hasNew != (*friends)[i].hasNewMessages) {
+                        (*friends)[i].hasNewMessages = hasNew;
+                        anyChanges = true;
+                    }
+                } catch (const std::exception& e) {
+                    // Handle error
                 }
+            }
+            
+            if (anyChanges) {
+                needsRefresh->store(true);
             }
         }
         
-        // Check every 2 seconds
-        std::this_thread::sleep_for(std::chrono::seconds(2));
+        // Check every 3 seconds
+        std::this_thread::sleep_for(std::chrono::seconds(3));
     }
 }
 
@@ -290,23 +315,37 @@ std::string getFriendsInput(const std::string& prompt) {
 }
 
 int showFriendsListScreen(int userId, const std::string& userName) {
+    initializeAsyncManager();
     initializeFriendsListScreen();
     
-    std::vector<FriendInfo> friends = getFriendsList(userId);
+    std::vector<FriendInfo> friends;
     int selectedFriend = 0;
     int selectedButton = 0;
     bool isInFriendsList = true;
     std::atomic<bool> needsRefresh{false};
     
-    // Start message checking thread
+    // Load friends list asynchronously
+    auto friendsFuture = queryManager->getFriendsListAsync(userId);
+    
+    // Start optimized message checking thread
     messageCheckRunning = true;
-    messageCheckThread = std::thread(checkForNewMessages, userId, &friends, &needsRefresh);
+    messageCheckThread = std::thread(checkForNewMessagesOptimized, userId, &friends, &needsRefresh);
+    
+    // Wait for initial friends list load
+    try {
+        friends = friendsFuture.get();
+        selectedFriend = std::min(selectedFriend, (int)friends.size() - 1);
+        if (selectedFriend < 0) selectedFriend = 0;
+    } catch (const std::exception& e) {
+        // Handle error
+        friends.clear();
+        showFriendsMessage("Failed to load friends list.", 3);
+    }
     
     while (true) {
         // Check if we need to refresh due to new messages
         if (needsRefresh.exchange(false)) {
-            // Refresh friends list to get updated message status
-            friends = getFriendsList(userId);
+            // Don't reload entire friends list, just update display
             selectedFriend = std::min(selectedFriend, (int)friends.size() - 1);
             if (selectedFriend < 0) selectedFriend = 0;
         }
@@ -354,8 +393,11 @@ int showFriendsListScreen(int userId, const std::string& userName) {
                 if (isInFriendsList) {
                     // Chat with selected friend
                     if (!friends.empty() && selectedFriend < friends.size()) {
-                        // Mark messages as read when starting chat
-                        markMessagesAsRead(userId, friends[selectedFriend].userId);
+                        // Mark messages as read asynchronously (non-blocking)
+                        queryManager->markMessagesAsReadAsync(userId, friends[selectedFriend].userId);
+                        
+                        // Update UI immediately
+                        friends[selectedFriend].hasNewMessages = false;
                         
                         // Stop message checking thread temporarily
                         messageCheckRunning = false;
@@ -369,12 +411,17 @@ int showFriendsListScreen(int userId, const std::string& userName) {
                         
                         // Restart message checking thread
                         messageCheckRunning = true;
-                        messageCheckThread = std::thread(checkForNewMessages, userId, &friends, &needsRefresh);
+                        messageCheckThread = std::thread(checkForNewMessagesOptimized, userId, &friends, &needsRefresh);
                         
-                        // Refresh friends list when returning
-                        friends = getFriendsList(userId);
-                        selectedFriend = std::min(selectedFriend, (int)friends.size() - 1);
-                        if (selectedFriend < 0) selectedFriend = 0;
+                        // Refresh friends list asynchronously
+                        auto refreshFuture = queryManager->getFriendsListAsync(userId);
+                        try {
+                            friends = refreshFuture.get();
+                            selectedFriend = std::min(selectedFriend, (int)friends.size() - 1);
+                            if (selectedFriend < 0) selectedFriend = 0;
+                        } catch (const std::exception& e) {
+                            showFriendsMessage("Failed to refresh friends list.", 3);
+                        }
                     }
                 } else {
                     // Handle button actions 
@@ -389,7 +436,16 @@ int showFriendsListScreen(int userId, const std::string& userName) {
                                     if (friendUserId > 0) {
                                         if (sendFriendRequest(userId, friendUserId)) {
                                             showFriendsMessage("Friend added successfully!", 2);
-                                            friends = getFriendsList(userId); // Refresh list
+                                            
+                                            // Refresh friends list asynchronously
+                                            auto refreshFuture = queryManager->getFriendsListAsync(userId);
+                                            try {
+                                                friends = refreshFuture.get();
+                                                selectedFriend = std::min(selectedFriend, (int)friends.size() - 1);
+                                                if (selectedFriend < 0) selectedFriend = 0;
+                                            } catch (const std::exception& e) {
+                                                showFriendsMessage("Failed to refresh friends list.", 3);
+                                            }
                                         } else {
                                             showFriendsMessage("Failed to add friend or already friends.", 3);
                                         }
@@ -403,8 +459,32 @@ int showFriendsListScreen(int userId, const std::string& userName) {
                         break;
                         
                         case 1: // DELETE FRIEND
-                            showFriendsMessage("Delete friend feature not implemented yet.", 4);
-                            break;
+                        {
+                            if (!friends.empty() && selectedFriend < friends.size()) {
+                                std::string confirmMsg = "Delete friend: " + friends[selectedFriend].nickname + "? (y/n)";
+                                std::string confirm = getFriendsInput(confirmMsg);
+                                if (confirm == "y" || confirm == "Y") {
+                                    if (removeFriend(userId, friends[selectedFriend].userId)) {
+                                        showFriendsMessage("Friend removed successfully.", 2);
+                                        
+                                        // Refresh friends list asynchronously
+                                        auto refreshFuture = queryManager->getFriendsListAsync(userId);
+                                        try {
+                                            friends = refreshFuture.get();
+                                            selectedFriend = std::min(selectedFriend, (int)friends.size() - 1);
+                                            if (selectedFriend < 0) selectedFriend = 0;
+                                        } catch (const std::exception& e) {
+                                            showFriendsMessage("Failed to refresh friends list.", 3);
+                                        }
+                                    } else {
+                                        showFriendsMessage("Failed to remove friend.", 3);
+                                    }
+                                }
+                            } else {
+                                showFriendsMessage("No friend selected to delete.", 4);
+                            }
+                        }
+                        break;
                             
                         case 2: // CANCEL
                             // Stop message checking thread
