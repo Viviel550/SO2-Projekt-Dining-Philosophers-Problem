@@ -1,5 +1,5 @@
 # Ignore Visual Studio Code Folder
 .vscode/
-
+build/
 # Ignore executable files
 *.exe

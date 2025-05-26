@@ -1,5 +1,6 @@
 #include "chatterminalf.h"
 #include "chatterminalback.h"
+#include "chatcommands.h"
 #include <ncurses/ncurses.h>
 #include <iostream>
 #include <string>
@@ -8,6 +9,8 @@
 #include <mutex>
 #include <chrono>
 #include <algorithm>
+#include <chrono>
+#include <ctime>
 
 std::mutex chatMutex; // Mutex for synchronizing access to chat history
 WINDOW* chatWindow = nullptr;
@@ -248,6 +251,8 @@ void drawInputArea(const std::string& currentInput) {
     wrefresh(inputWindow);
 }
 
+
+
 void receiveMessages(int userId, int otherUserId, bool& chatting) {
     while (chatting) {
         try {
@@ -325,6 +330,7 @@ void receiveMessages(int userId, int otherUserId, bool& chatting) {
     }
 }
 
+
 // Replace the showChatTerminal function with this version:
 int showChatTerminal(int userId, int otherUserId, const std::string& userName) {
     initializeChatTerminal();
@@ -385,8 +391,8 @@ int showChatTerminal(int userId, int otherUserId, const std::string& userName) {
                     
                 case 10: // ENTER
                 case 13: // ENTER
-                    if (currentInput == "/exit") {
-                        chatting = false;
+                    if (currentInput[0] == '/') {
+                        processCommand(currentInput, userId, otherUserId, currentInput, chatting, needsRefresh);
                     } else if (!currentInput.empty()) {
                         if (sendMessage(userId, otherUserId, currentInput)) {
                             currentInput = "";

@@ -1,1 +1,2 @@
- NCURSES (C++ Library) - For Terminal update instead of classic ASCI
+Make many querries executable at once
+Reuse connection if possible
