@@ -1,0 +1,2 @@
+Make many querries executable at once
+Reuse connection if possible

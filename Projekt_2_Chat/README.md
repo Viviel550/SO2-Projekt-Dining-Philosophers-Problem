@@ -27,9 +27,22 @@ Aplikacja czatu terminalowego umożliwia komunikację tekstową pomiędzy użytk
     psql Chat < Chat.sql
     ```
 3. Skompiluj projekt:
-    ```sh
-    g++ -std=c++11 -o chat_app main.cpp Chatfiles/Register/register.cpp Chatfiles/Register/registerback.cpp Chatfiles/Login/login.cpp Chatfiles/Login/loginback.cpp Chatfiles/MainTerminal/mainterminal.cpp Chatfiles/MainTerminal/mainterminalback.cpp Chatfiles/ChatTerminal/chatterminal.cpp Chatfiles/ChatTerminal/chatterminalback.cpp -lpqxx -lpq
-    ```
+    1. **Bezpośrednio**
+       - **Windows (MSYS2/MinGW):**
+        ```sh
+        g++ -std=c++17 main.cpp Chatfiles/Login/*.cpp Chatfiles/Register/*.cpp Chatfiles/MainTerminal/*.cpp Chatfiles/ChatTerminal/*.cpp Chatfiles/FriendList/*.cpp  -o chat_app.exe -lpqxx -lpq -lncursesw
+        ```
+    2. **Przy użyciu CMakeList z generatorem Ninja**
+        ```sh
+        mkdir build
+        cd build
+        cmake -G Ninja .. -DCMAKE_BUILD_TYPE=Release
+        cmake --build .
+        ```
+    3. **Przy użyciu makefile**
+        ```sh
+        make
+        ```
 4. Uruchom program:
     ```sh
     ./chat_app
