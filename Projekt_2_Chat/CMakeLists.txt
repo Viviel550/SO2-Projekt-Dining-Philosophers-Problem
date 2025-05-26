@@ -50,6 +50,7 @@ set(SOURCES
     Chatfiles/MainTerminal/mainterminalback.cpp
     Chatfiles/ChatTerminal/chatterminal.cpp
     Chatfiles/ChatTerminal/chatterminalback.cpp
+    Chatfiles/ChatTerminal/chatcommands.cpp
     Chatfiles/FriendList/friendlist.cpp
     Chatfiles/FriendList/friendlistback.cpp
 )
