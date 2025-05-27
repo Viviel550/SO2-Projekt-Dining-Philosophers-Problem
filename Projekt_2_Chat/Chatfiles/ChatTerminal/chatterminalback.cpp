@@ -165,3 +165,32 @@ std::vector<Message> getLatestChatHistory(int userId, int otherUserId, int limit
     
     return messages;
 }
+
+UserInfo getUserInfo(int userId) {
+    std::string CONNECTION_STRING = DBConfig::getConnectionString();
+    UserInfo userInfo;
+    userInfo.userId = userId;
+    userInfo.userName = "Unknown";
+    userInfo.userNameId = "0000";
+    
+    try {
+        pqxx::connection conn(CONNECTION_STRING);
+        pqxx::work txn(conn);
+        
+        auto result = txn.exec(
+            "SELECT user_name, user_name_id FROM users WHERE user_id = $1",
+            pqxx::params(userId)
+        );
+        
+        if (!result.empty()) {
+            userInfo.userName = result[0]["user_name"].as<std::string>();
+            userInfo.userNameId = result[0]["user_name_id"].as<std::string>();
+        }
+        
+        txn.commit();
+    } catch (const std::exception& e) {
+        std::cerr << "Error getting user info: " << e.what() << std::endl;
+    }
+    
+    return userInfo;
+}
