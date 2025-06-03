@@ -1,10 +1,12 @@
 #include "friendlistback.h"
+#include "../Database/AsyncQueryManager.h"
 #include <iostream>
 #include <pqxx/pqxx>
 #include <string>
 #include <fstream>
 #include <ctime>
 #include <vector>
+#include <thread>
 #include "../Config.h"
 
 void debugLog(const std::string& message) {
@@ -176,7 +178,35 @@ void markMessagesAsRead(int userId, int friendId) {
     }
 }
 
-// Update getFriendsList to check for new messages
+// NEW: Async mark messages as read using detached thread
+void markMessagesAsReadAsync(int userId, int friendId) {
+    std::thread([userId, friendId]() {
+        try {
+            std::string CONNECTION_STRING = DBConfig::getConnectionString();
+            pqxx::connection conn(CONNECTION_STRING);
+            pqxx::work txn(conn);
+            txn.exec(
+                "UPDATE user_chat SET read_status = TRUE "
+                "WHERE sender_id = $1 AND receiver_id = $2 AND read_status = FALSE",
+                pqxx::params(friendId, userId)
+            );
+            txn.commit();
+            debugLog("markMessagesAsReadAsync: Marked messages as read from friend " + std::to_string(friendId));
+        } catch (const std::exception& e) {
+            debugLog("markMessagesAsReadAsync ERROR: " + std::string(e.what()));
+        }
+    }).detach();
+}
+
+void markMessagesAsReadAsyncWithManager(AsyncQueryManager* queryManager, int userId, int friendId) {
+    if (queryManager) {
+        queryManager->markMessagesAsReadAsync(userId, friendId);
+    } else {
+        // Fallback to simple async version
+        markMessagesAsReadAsync(userId, friendId);
+    }
+}
+
 std::vector<FriendInfo> getFriendsList(int userId) {
     std::string CONNECTION_STRING = DBConfig::getConnectionString();
     std::vector<FriendInfo> friends;
@@ -240,4 +270,3 @@ int findUserByNicknameAndId(const std::string& nickname, const std::string& user
     
     return -1;
 }
-

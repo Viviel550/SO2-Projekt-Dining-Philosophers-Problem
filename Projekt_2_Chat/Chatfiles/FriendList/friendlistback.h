@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <future>
 
 struct FriendInfo {
     int userId;
@@ -10,6 +11,9 @@ struct FriendInfo {
     std::string userNameId;
     bool hasNewMessages = false;
 };
+
+// Forward declaration
+class AsyncQueryManager;
 
 // Friend management functions
 bool sendFriendRequest(int senderId, int receiverId);
@@ -19,4 +23,9 @@ std::vector<FriendInfo> getFriendsList(int userId);
 int findUserByNicknameAndId(const std::string& nickname, const std::string& userNameId);
 bool hasNewMessagesFrom(int userId, int otherUserId);
 void markMessagesAsRead(int userId, int otherUserId);
+
+// New async functions
+void markMessagesAsReadAsync(int userId, int friendId);
+void markMessagesAsReadAsyncWithManager(AsyncQueryManager* queryManager, int userId, int friendId);
+
 #endif // FRIENDLISTBACK_H

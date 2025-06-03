@@ -201,8 +201,8 @@ static int PrivateChat(const std::string& userNameId, const int userId, const st
         // Cleanup main terminal before starting chat
         cleanupMainTerminal();
         
-        // Forward to chat terminal
-        showChatTerminal(userId, otherUserIdInt, userName);
+        // Forward to chat terminal with user display information
+        showChatTerminal(userId, otherUserIdInt, userName, userNameId, otherUserName, otherUserId);
         
         // Reinitialize main terminal when returning from chat
         initializeMainTerminal();
@@ -219,14 +219,14 @@ static int JoinChatRoom() {
     return 0;
 }
 
-static int FriendsList(const int userId, const std::string& userName) {
+static int FriendsList(const int userId, const std::string& userName, const std::string& userNameId) {
     clearMainTerminalMessageArea();
     
     // Cleanup main terminal before starting friends list
     cleanupMainTerminal();
     
     // Show friends list screen
-    showFriendsListScreen(userId, userName);
+    showFriendsListScreen(userId, userName, userNameId);
     
     // Reinitialize main terminal when returning
     initializeMainTerminal();
@@ -289,7 +289,7 @@ int showMainTerminal(const std::string& userEmail, const std::string& userNameId
                         break;
                         
                     case 2: // Friends List
-                        FriendsList(userId, Name);
+                        FriendsList(userId, Name, userNameId);
                         break;
                         
                     case 3: // Logout

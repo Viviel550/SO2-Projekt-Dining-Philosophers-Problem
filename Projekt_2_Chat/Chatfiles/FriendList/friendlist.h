@@ -4,6 +4,6 @@
 #include <string>
 
 // Show friends list interface
-int showFriendsListScreen(int userId, const std::string& userName);
+int showFriendsListScreen(int userId, const std::string& userName, const std::string& userNameId);
 
 #endif // FRIENDLIST_H

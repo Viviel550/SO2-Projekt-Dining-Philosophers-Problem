@@ -53,6 +53,8 @@ set(SOURCES
     Chatfiles/ChatTerminal/chatcommands.cpp
     Chatfiles/FriendList/friendlist.cpp
     Chatfiles/FriendList/friendlistback.cpp
+    Chatfiles/Database/AsyncQueryManager.cpp
+    Chatfiles/Database/ConnectionPool.cpp
 )
 
 # Create executable

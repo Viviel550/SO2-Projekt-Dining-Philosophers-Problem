@@ -18,6 +18,13 @@ struct Message {
     }
 };
 
+struct UserInfo {
+    int userId;
+    std::string userName;
+    std::string userNameId;
+};
+
+
 // Send a message from one user to another
 bool sendMessage(int senderId, int receiverId, const std::string& content);
 
@@ -25,5 +32,6 @@ bool sendMessage(int senderId, int receiverId, const std::string& content);
 std::vector<Message> getChatHistory(int userId, int otherUserId, int limit);
 std::vector<Message> getOlderChatHistory(int userId, int otherUserId, int limit, int offset);
 std::vector<Message> getLatestChatHistory(int userId, int otherUserId, int limit);
+UserInfo getUserInfo(int userId);
 
 #endif // CHATTERMINALBACK_H

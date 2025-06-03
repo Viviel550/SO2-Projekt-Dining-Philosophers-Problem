@@ -8,26 +8,70 @@
 #include "friendlistback.h"
 #include <ncurses/ncurses.h>
 #include "../ChatTerminal/chatterminalf.h"
+#include "../Database/AsyncQueryManager.h"
 
 static std::atomic<bool> messageCheckRunning{false};
 static std::thread messageCheckThread;
+static std::unique_ptr<AsyncQueryManager> queryManager;
+static std::atomic<bool> messageCheckInterrupt{false};
 
 
-void checkForNewMessages(int userId, std::vector<FriendInfo>* friends, std::atomic<bool>* needsRefresh) {
+void handleKeyUp(std::vector<FriendInfo>& friends, int& selectedFriend, int& selectedButton, bool isInFriendsList);
+void handleKeyDown(std::vector<FriendInfo>& friends, int& selectedFriend, int& selectedButton, bool isInFriendsList);
+void handleEnterKey(std::vector<FriendInfo>& friends, int& selectedFriend, int selectedButton, bool isInFriendsList, 
+                   int userId, const std::string& userName, std::atomic<bool>& needsRefresh);
+void handleAddFriend(std::vector<FriendInfo>& friends, int& selectedFriend, int userId);
+void handleDeleteFriend(std::vector<FriendInfo>& friends, int& selectedFriend, int userId);
+bool handleChatWithFriend(std::vector<FriendInfo>& friends, int selectedFriend, int userId, const std::string& userName, const std::string& userNameId);
+void stopMessageCheckingThread();
+void startMessageCheckingThread(int userId, std::vector<FriendInfo>* friends, std::atomic<bool>* needsRefresh);
+void refreshFriendsList(std::vector<FriendInfo>& friends, int& selectedFriend, int userId);
+
+void initializeAsyncManager() {
+    if (!queryManager) {
+        queryManager = std::make_unique<AsyncQueryManager>(4);
+    }
+}
+
+void checkForNewMessagesOptimized(int userId, std::vector<FriendInfo>* friends, std::atomic<bool>* needsRefresh) {
     while (messageCheckRunning) {
-        if (friends && needsRefresh) {
-            // Update each friend's new message status
-            for (auto& friend_info : *friends) {
-                bool hasNew = hasNewMessagesFrom(userId, friend_info.userId);
-                if (hasNew != friend_info.hasNewMessages) {
-                    friend_info.hasNewMessages = hasNew;
-                    needsRefresh->store(true);
-                }
-            }
+        // Check for interrupt every 100ms instead of sleeping for 3 seconds straight
+        for (int i = 0; i < 30 && messageCheckRunning && !messageCheckInterrupt; ++i) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
         
-        // Check every 2 seconds
-        std::this_thread::sleep_for(std::chrono::seconds(2));
+        if (messageCheckInterrupt.exchange(false) || !messageCheckRunning) {
+            break;
+        }
+        
+        if (friends && needsRefresh && !friends->empty()) {
+            // Batch check for new messages from all friends
+            std::vector<std::future<bool>> futures;
+            
+            for (size_t i = 0; i < friends->size(); ++i) {
+                futures.push_back(
+                    queryManager->hasNewMessagesFromAsync(userId, (*friends)[i].userId)
+                );
+            }
+            
+            // Collect results
+            bool anyChanges = false;
+            for (size_t i = 0; i < futures.size() && i < friends->size(); ++i) {
+                try {
+                    bool hasNew = futures[i].get();
+                    if (hasNew != (*friends)[i].hasNewMessages) {
+                        (*friends)[i].hasNewMessages = hasNew;
+                        anyChanges = true;
+                    }
+                } catch (const std::exception& e) {
+                    // Handle error
+                }
+            }
+            
+            if (anyChanges) {
+                needsRefresh->store(true);
+            }
+        }
     }
 }
 
@@ -289,59 +333,187 @@ std::string getFriendsInput(const std::string& prompt) {
     return std::string(input);
 }
 
-int showFriendsListScreen(int userId, const std::string& userName) {
+void handleKeyUp(std::vector<FriendInfo>& friends, int& selectedFriend, int& selectedButton, bool isInFriendsList) {
+    if (isInFriendsList) {
+        if (!friends.empty()) {
+            selectedFriend = (selectedFriend == 0) ? friends.size() - 1 : selectedFriend - 1;
+        }
+    } else {
+        selectedButton = (selectedButton == 0) ? 2 : selectedButton - 1;
+    }
+}
+
+void handleKeyDown(std::vector<FriendInfo>& friends, int& selectedFriend, int& selectedButton, bool isInFriendsList) {
+    if (isInFriendsList) {
+        if (!friends.empty()) {
+            selectedFriend = (selectedFriend + 1) % friends.size();
+        }
+    } else {
+        selectedButton = (selectedButton + 1) % 3;
+    }
+}
+
+bool handleChatWithFriend(std::vector<FriendInfo>& friends, int selectedFriend, int userId, const std::string& userName, const std::string& userNameId) {
+    if (friends.empty() || selectedFriend >= friends.size()) {
+        return false;
+    }
+    
+    // Update UI immediately
+    friends[selectedFriend].hasNewMessages = false;
+    
+    // Mark messages as read asynchronously (non-blocking)
+    markMessagesAsReadAsyncWithManager(queryManager.get(), userId, friends[selectedFriend].userId);
+    
+    // Stop message checking thread
+    stopMessageCheckingThread();
+    
+    cleanupFriendsListScreen();
+    showChatTerminal(userId, friends[selectedFriend].userId, userName, userNameId, 
+                    friends[selectedFriend].nickname, friends[selectedFriend].userNameId);
     initializeFriendsListScreen();
     
-    std::vector<FriendInfo> friends = getFriendsList(userId);
+    return true;
+}
+
+void handleAddFriend(std::vector<FriendInfo>& friends, int& selectedFriend, int userId) {
+    std::string nickname = getFriendsInput("Enter friend's nickname:");
+    if (nickname.empty()) return;
+    
+    std::string userNameId = getFriendsInput("Enter friend's user ID:");
+    if (userNameId.empty()) return;
+    
+    int friendUserId = findUserByNicknameAndId(nickname, userNameId);
+    if (friendUserId > 0) {
+        if (sendFriendRequest(userId, friendUserId)) {
+            showFriendsMessage("Friend added successfully!", 2);
+            refreshFriendsList(friends, selectedFriend, userId);
+        } else {
+            showFriendsMessage("Failed to add friend or already friends.", 3);
+        }
+    } else {
+        std::string errorMessage = "User not found: " + nickname + "#" + userNameId;
+        showFriendsMessage(errorMessage, 3);
+    }
+}
+
+void handleDeleteFriend(std::vector<FriendInfo>& friends, int& selectedFriend, int userId) {
+    if (friends.empty() || selectedFriend >= friends.size()) {
+        showFriendsMessage("No friend selected to delete.", 4);
+        return;
+    }
+    
+    std::string confirmMsg = "Delete friend: " + friends[selectedFriend].nickname + "? (y/n)";
+    std::string confirm = getFriendsInput(confirmMsg);
+    
+    if (confirm == "y" || confirm == "Y") {
+        if (removeFriend(userId, friends[selectedFriend].userId)) {
+            showFriendsMessage("Friend removed successfully.", 2);
+            refreshFriendsList(friends, selectedFriend, userId);
+        } else {
+            showFriendsMessage("Failed to remove friend.", 3);
+        }
+    }
+}
+
+void handleEnterKey(std::vector<FriendInfo>& friends, int& selectedFriend, int selectedButton, bool isInFriendsList, 
+                   int userId, const std::string& userName, const std::string& userNameId, std::atomic<bool>& needsRefresh) {
+    if (isInFriendsList) {
+        if (handleChatWithFriend(friends, selectedFriend, userId, userName, userNameId)) {
+            // Restart message checking and refresh after returning from chat
+            startMessageCheckingThread(userId, &friends, &needsRefresh);
+            refreshFriendsList(friends, selectedFriend, userId);
+        }
+    } else {
+        // Handle button actions
+        switch (selectedButton) {
+            case 0: // ADD NEW FRIEND
+                handleAddFriend(friends, selectedFriend, userId);
+                break;
+                
+            case 1: // DELETE FRIEND
+                handleDeleteFriend(friends, selectedFriend, userId);
+                break;
+                
+            case 2: // CANCEL - handled in main function
+                break;
+        }
+    }
+}
+
+void stopMessageCheckingThread() {
+    messageCheckInterrupt = true;
+    messageCheckRunning = false;
+    if (messageCheckThread.joinable()) {
+        messageCheckThread.join();
+    }
+}
+
+void startMessageCheckingThread(int userId, std::vector<FriendInfo>* friends, std::atomic<bool>* needsRefresh) {
+    messageCheckRunning = true;
+    messageCheckThread = std::thread(checkForNewMessagesOptimized, userId, friends, needsRefresh);
+}
+
+void refreshFriendsList(std::vector<FriendInfo>& friends, int& selectedFriend, int userId) {
+    try {
+        auto refreshFuture = queryManager->getFriendsListAsync(userId);
+        friends = refreshFuture.get();
+        selectedFriend = std::min(selectedFriend, (int)friends.size() - 1);
+        if (selectedFriend < 0) selectedFriend = 0;
+    } catch (const std::exception& e) {
+        showFriendsMessage("Failed to refresh friends list.", 3);
+    }
+}
+
+// Simplified main function
+int showFriendsListScreen(int userId, const std::string& userName, const std::string& userNameId) {
+    initializeAsyncManager();
+    initializeFriendsListScreen();
+    
+    std::vector<FriendInfo> friends;
     int selectedFriend = 0;
     int selectedButton = 0;
     bool isInFriendsList = true;
     std::atomic<bool> needsRefresh{false};
     
+    // Load friends list asynchronously
+    try {
+        auto friendsFuture = queryManager->getFriendsListAsync(userId);
+        friends = friendsFuture.get();
+        selectedFriend = std::min(selectedFriend, (int)friends.size() - 1);
+        if (selectedFriend < 0) selectedFriend = 0;
+    } catch (const std::exception& e) {
+        friends.clear();
+        showFriendsMessage("Failed to load friends list.", 3);
+    }
+    
     // Start message checking thread
-    messageCheckRunning = true;
-    messageCheckThread = std::thread(checkForNewMessages, userId, &friends, &needsRefresh);
+    startMessageCheckingThread(userId, &friends, &needsRefresh);
     
     while (true) {
         // Check if we need to refresh due to new messages
         if (needsRefresh.exchange(false)) {
-            // Refresh friends list to get updated message status
-            friends = getFriendsList(userId);
             selectedFriend = std::min(selectedFriend, (int)friends.size() - 1);
             if (selectedFriend < 0) selectedFriend = 0;
         }
         
+        // Draw UI
         clear();
-        
         drawFriendsListHeader();
         drawFriendsListArea(friends, selectedFriend, isInFriendsList);
         drawButtonArea(selectedButton, !isInFriendsList);
-        
         refresh();
         
-        // Set timeout to allow periodic refresh
+        // Handle input
         timeout(500);
         int ch = getch();
         
         switch (ch) {
             case KEY_UP:
-                if (isInFriendsList) {
-                    if (!friends.empty()) {
-                        selectedFriend = (selectedFriend == 0) ? friends.size() - 1 : selectedFriend - 1;
-                    }
-                } else {
-                    selectedButton = (selectedButton == 0) ? 2 : selectedButton - 1;
-                }
+                handleKeyUp(friends, selectedFriend, selectedButton, isInFriendsList);
                 break;
                 
             case KEY_DOWN:
-                if (isInFriendsList) {
-                    if (!friends.empty()) {
-                        selectedFriend = (selectedFriend + 1) % friends.size();
-                    }
-                } else {
-                    selectedButton = (selectedButton + 1) % 3;
-                }
+                handleKeyDown(friends, selectedFriend, selectedButton, isInFriendsList);
                 break;
                 
             case 9: // TAB - Switch between areas
@@ -351,79 +523,19 @@ int showFriendsListScreen(int userId, const std::string& userName) {
             case 10: // ENTER
             case 13: // ENTER
             case 32: // SPACE
-                if (isInFriendsList) {
-                    // Chat with selected friend
-                    if (!friends.empty() && selectedFriend < friends.size()) {
-                        // Mark messages as read when starting chat
-                        markMessagesAsRead(userId, friends[selectedFriend].userId);
-                        
-                        // Stop message checking thread temporarily
-                        messageCheckRunning = false;
-                        if (messageCheckThread.joinable()) {
-                            messageCheckThread.join();
-                        }
-                        
-                        cleanupFriendsListScreen();
-                        showChatTerminal(userId, friends[selectedFriend].userId, userName);
-                        initializeFriendsListScreen();
-                        
-                        // Restart message checking thread
-                        messageCheckRunning = true;
-                        messageCheckThread = std::thread(checkForNewMessages, userId, &friends, &needsRefresh);
-                        
-                        // Refresh friends list when returning
-                        friends = getFriendsList(userId);
-                        selectedFriend = std::min(selectedFriend, (int)friends.size() - 1);
-                        if (selectedFriend < 0) selectedFriend = 0;
-                    }
+                if (selectedButton == 2 && !isInFriendsList) {
+                    // CANCEL button - exit
+                    stopMessageCheckingThread();
+                    cleanupFriendsListScreen();
+                    return 0;
                 } else {
-                    // Handle button actions 
-                    switch (selectedButton) {
-                        case 0: // ADD NEW FRIEND
-                        {
-                            std::string nickname = getFriendsInput("Enter friend's nickname:");
-                            if (!nickname.empty()) {
-                                std::string userNameId = getFriendsInput("Enter friend's user ID:");
-                                if (!userNameId.empty()) {
-                                    int friendUserId = findUserByNicknameAndId(nickname, userNameId);
-                                    if (friendUserId > 0) {
-                                        if (sendFriendRequest(userId, friendUserId)) {
-                                            showFriendsMessage("Friend added successfully!", 2);
-                                            friends = getFriendsList(userId); // Refresh list
-                                        } else {
-                                            showFriendsMessage("Failed to add friend or already friends.", 3);
-                                        }
-                                    } else {
-                                        std::string errorMessage = "User not found: " + nickname + "#" + userNameId;
-                                        showFriendsMessage(errorMessage, 3);
-                                    }
-                                }
-                            }
-                        }
-                        break;
-                        
-                        case 1: // DELETE FRIEND
-                            showFriendsMessage("Delete friend feature not implemented yet.", 4);
-                            break;
-                            
-                        case 2: // CANCEL
-                            // Stop message checking thread
-                            messageCheckRunning = false;
-                            if (messageCheckThread.joinable()) {
-                                messageCheckThread.join();
-                            }
-                            cleanupFriendsListScreen();
-                            return 0;
-                    }
+                    handleEnterKey(friends, selectedFriend, selectedButton, isInFriendsList, 
+                                userId, userName, userNameId, needsRefresh);
                 }
                 break;
                 
             case 27: // ESC
-                // Stop message checking thread
-                messageCheckRunning = false;
-                if (messageCheckThread.joinable()) {
-                    messageCheckThread.join();
-                }
+                stopMessageCheckingThread();
                 cleanupFriendsListScreen();
                 return 0;
                 
@@ -437,10 +549,7 @@ int showFriendsListScreen(int userId, const std::string& userName) {
     }
     
     // Cleanup (shouldn't reach here, but just in case)
-    messageCheckRunning = false;
-    if (messageCheckThread.joinable()) {
-        messageCheckThread.join();
-    }
+    stopMessageCheckingThread();
     cleanupFriendsListScreen();
     return 0;
 }
