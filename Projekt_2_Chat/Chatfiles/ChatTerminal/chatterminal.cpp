@@ -1,6 +1,8 @@
 #include "chatterminalf.h"
 #include "chatterminalback.h"
 #include "chatcommands.h"
+#include "../FriendList/friendlistback.h"
+#include "../FriendList/friendlist.h"
 #include <ncurses/ncurses.h>
 #include <iostream>
 #include <string>
@@ -9,13 +11,14 @@
 #include <mutex>
 #include <chrono>
 #include <algorithm>
-#include <chrono>
 #include <ctime>
 
-std::mutex chatMutex; // Mutex for synchronizing access to chat history
+// Global variables
+std::mutex chatMutex;
 WINDOW* chatWindow = nullptr;
 WINDOW* inputWindow = nullptr;
 WINDOW* headerWindow = nullptr;
+WINDOW* buttonWindow = nullptr;
 std::vector<Message> globalChatHistory;
 int scrollPosition = 0;
 bool needsRefresh = true;
@@ -24,7 +27,13 @@ bool isLoadingOlderMessages = false;
 bool hasMoreOlderMessages = true;
 std::string currentUserDisplay = "";
 std::string otherUserDisplay = "";
+int selectedButton = 0;
+bool isInButtonArea = false;
+int currentChatUserId = 0;
+static bool hasNewMessagesFromFriends = false;
+static auto lastFriendMessageCheck = std::chrono::steady_clock::now();
 
+// Function declarations
 void loadOlderMessages(int userId, int otherUserId);
 void updateRecentMessages(int userId, int otherUserId);
 void handleKeyInput(int ch, std::string& currentInput, int userId, int otherUserId, bool& chatting);
@@ -33,8 +42,36 @@ void handleBackspace(std::string& currentInput);
 void handleScrollUp();
 void handleScrollDown();
 void refreshChatDisplay(int userId, const std::string& currentInput);
+void drawButtonArea();
+void drawChatHeader(const std::string& otherUserName);
+void drawChatHistory(int userId);
+void drawInputArea(const std::string& currentInput);
 
+bool hasNewMessagesFromAnyFriend(int userId) {
+    auto now = std::chrono::steady_clock::now();
+    
+    // Check for new messages every 3 seconds regardless of what the user is doing
+    if (std::chrono::duration_cast<std::chrono::seconds>(now - lastFriendMessageCheck).count() >= 3) {
+        try {
+            std::vector<FriendInfo> friends = getFriendsList(userId);
+            
+            hasNewMessagesFromFriends = false;
+            for (const auto& friendInfo : friends) {
+                if (friendInfo.hasNewMessages) {
+                    hasNewMessagesFromFriends = true;
+                    break;
+                }
+            }
+        } catch (const std::exception& e) {
+            // Handle error silently to avoid breaking the UI
+        }
+        lastFriendMessageCheck = now;
+    }
+    
+    return hasNewMessagesFromFriends;
+}
 
+// Terminal initialization
 void initializeChatTerminal() {
     initscr();
     cbreak();
@@ -44,37 +81,333 @@ void initializeChatTerminal() {
     
     if (has_colors()) {
         start_color();
-        init_pair(1, COLOR_CYAN, COLOR_BLACK);    // Header
-        init_pair(2, COLOR_GREEN, COLOR_BLACK);   // User messages
-        init_pair(3, COLOR_YELLOW, COLOR_BLACK);  // Other messages
-        init_pair(4, COLOR_WHITE, COLOR_BLACK);   // Normal text
-        init_pair(5, COLOR_RED, COLOR_BLACK);     // Error messages
-        init_pair(6, COLOR_BLUE, COLOR_BLACK);    // Instructions
+        init_pair(1, COLOR_CYAN, COLOR_BLACK);
+        init_pair(2, COLOR_GREEN, COLOR_BLACK);
+        init_pair(3, COLOR_YELLOW, COLOR_BLACK);
+        init_pair(4, COLOR_WHITE, COLOR_BLACK);
+        init_pair(5, COLOR_RED, COLOR_BLACK);
+        init_pair(6, COLOR_BLUE, COLOR_BLACK);
+        init_pair(7, COLOR_BLACK, COLOR_GREEN);
+        init_pair(8, COLOR_WHITE, COLOR_BLACK);
     }
     
-    // Get terminal dimensions
     int max_y, max_x;
     getmaxyx(stdscr, max_y, max_x);
     
-    // Create windows
-    // Header window (top 3 lines)
-    headerWindow = newwin(3, max_x, 0, 0);
-    
-    // Chat history window (middle area, scrollable)
-    chatWindow = newwin(max_y - 6, max_x, 3, 0);
+    buttonWindow = newwin(3, max_x, 0, 0);
+    headerWindow = newwin(3, max_x, 3, 0);
+    chatWindow = newwin(max_y - 9, max_x, 6, 0);
     scrollok(chatWindow, TRUE);
-    
-    // Input window (bottom 3 lines)
     inputWindow = newwin(3, max_x, max_y - 3, 0);
     
     refresh();
 }
 
 void cleanupChatTerminal() {
+    if (buttonWindow) delwin(buttonWindow);
     if (headerWindow) delwin(headerWindow);
     if (chatWindow) delwin(chatWindow);
     if (inputWindow) delwin(inputWindow);
     endwin();
+}
+
+// Button handling functions
+void handleButtonExit(bool& chatting) {
+    chatting = false;
+}
+
+void handleButtonFriends(int userId, bool& chatting) {
+    chatting = false;
+    cleanupChatTerminal();
+    showFriendsListScreen(userId, currentUserDisplay, otherUserDisplay);
+}
+
+void showInviteSuccessMessage() {
+    if (has_colors()) {
+        wattron(buttonWindow, COLOR_PAIR(2));
+    }
+    mvwprintw(buttonWindow, 0, 2, "Friend request sent!");
+    if (has_colors()) {
+        wattroff(buttonWindow, COLOR_PAIR(2));
+    }
+    wrefresh(buttonWindow);
+    napms(1500);
+}
+
+void showInviteErrorMessage() {
+    if (has_colors()) {
+        wattron(buttonWindow, COLOR_PAIR(5));
+    }
+    mvwprintw(buttonWindow, 0, 2, "Failed to send friend request or already friends.");
+    if (has_colors()) {
+        wattroff(buttonWindow, COLOR_PAIR(5));
+    }
+    wrefresh(buttonWindow);
+    napms(1500);
+}
+
+void handleButtonInvite(int userId, int otherUserId) {
+    if (sendFriendRequest(userId, otherUserId)) {
+        showInviteSuccessMessage();
+    } else {
+        showInviteErrorMessage();
+    }
+    needsRefresh = true;
+}
+
+void handleButtonSelection(int userId, int otherUserId, bool& chatting) {
+    switch (selectedButton) {
+        case 0:
+            handleButtonExit(chatting);
+            break;
+        case 1:
+            handleButtonFriends(userId, chatting);
+            break;
+        case 2:
+            handleButtonInvite(userId, otherUserId);
+            break;
+    }
+}
+
+void moveButtonLeft() {
+    selectedButton = (selectedButton == 0) ? 2 : selectedButton - 1;
+    needsRefresh = true;
+}
+
+void moveButtonRight() {
+    selectedButton = (selectedButton + 1) % 3;
+    needsRefresh = true;
+}
+
+void handleButtonAreaKeys(int ch, int userId, int otherUserId, bool& chatting) {
+    switch (ch) {
+        case KEY_LEFT:
+            moveButtonLeft();
+            break;
+        case KEY_RIGHT:
+            moveButtonRight();
+            break;
+        case 10:
+        case 13:
+        case 32:
+            handleButtonSelection(userId, otherUserId, chatting);
+            break;
+        case 27:
+            chatting = false;
+            break;
+    }
+}
+
+// Area switching
+void switchToButtonArea() {
+    isInButtonArea = true;
+    curs_set(0);
+    needsRefresh = true;
+}
+
+void switchToChatArea() {
+    isInButtonArea = false;
+    curs_set(1);
+    needsRefresh = true;
+}
+
+void handleTabKey() {
+    if (isInButtonArea) {
+        switchToChatArea();
+    } else {
+        switchToButtonArea();
+    }
+}
+
+// Scrolling functions
+bool shouldLoadOlderMessages() {
+    return scrollPosition >= (int)globalChatHistory.size() - 10 && 
+           hasMoreOlderMessages && 
+           !isLoadingOlderMessages;
+}
+
+void handleScrollUp() {
+    if (!isInButtonArea) {
+        scrollPosition++;
+        if (shouldLoadOlderMessages()) {
+            isLoadingOlderMessages = true;
+        }
+    }
+}
+
+void handleScrollDown() {
+    if (!isInButtonArea) {
+        scrollPosition = std::max(0, scrollPosition - 1);
+    }
+}
+
+void handleScrollKeys(int ch) {
+    switch (ch) {
+        case KEY_UP:
+            handleScrollUp();
+            needsRefresh = true;
+            break;
+        case KEY_DOWN:
+            handleScrollDown();
+            needsRefresh = true;
+            break;
+    }
+}
+
+// Input handling functions
+void handleBackspace(std::string& currentInput) {
+    if (!currentInput.empty() && !isInButtonArea) {
+        currentInput.pop_back();
+    }
+}
+
+void handleRegularCharacter(char ch, std::string& currentInput) {
+    if (ch >= 32 && ch <= 126 && !isInButtonArea) {
+        currentInput += ch;
+    }
+}
+
+void processCommandInput(const std::string& currentInput, std::string& inputBuffer, int userId, int otherUserId, bool& chatting) {
+    processCommand(currentInput, userId, otherUserId, inputBuffer, chatting, needsRefresh);
+}
+
+void updateChatAfterSendMessage(int userId, int otherUserId) {
+    scrollPosition = 0;
+    std::lock_guard<std::mutex> lock(chatMutex);
+    globalChatHistory = getLatestChatHistory(userId, otherUserId, 50);
+    totalLoadedMessages = std::max(totalLoadedMessages, (int)globalChatHistory.size());
+}
+
+void processRegularMessage(const std::string& currentInput, std::string& inputBuffer, int userId, int otherUserId) {
+    if (sendMessage(userId, otherUserId, currentInput)) {
+        inputBuffer = "";
+        updateChatAfterSendMessage(userId, otherUserId);
+        needsRefresh = true;
+    }
+}
+
+void handleEnterKey(const std::string& currentInput, std::string& inputBuffer, int userId, int otherUserId, bool& chatting) {
+    if (currentInput.empty() || isInButtonArea) return;
+    
+    if (currentInput[0] == '/') {
+        processCommandInput(currentInput, inputBuffer, userId, otherUserId, chatting);
+    } else {
+        processRegularMessage(currentInput, inputBuffer, userId, otherUserId);
+    }
+}
+
+void handleChatInputKeys(int ch, std::string& currentInput, int userId, int otherUserId, bool& chatting) {
+    switch (ch) {
+        case 10:
+        case 13:
+            handleEnterKey(currentInput, currentInput, userId, otherUserId, chatting);
+            needsRefresh = true;
+            break;
+        case KEY_BACKSPACE:
+        case 127:
+        case 8:
+            handleBackspace(currentInput);
+            needsRefresh = true;
+            break;
+        case 27:
+            chatting = false;
+            break;
+    }
+}
+
+void handleChatAreaKeys(int ch, std::string& currentInput, int userId, int otherUserId, bool& chatting) {
+    if (ch == KEY_UP || ch == KEY_DOWN) {
+        handleScrollKeys(ch);
+        return;
+    }
+    
+    if (ch == 10 || ch == 13 || ch == KEY_BACKSPACE || ch == 127 || ch == 8 || ch == 27) {
+        handleChatInputKeys(ch, currentInput, userId, otherUserId, chatting);
+        return;
+    }
+    
+    handleRegularCharacter((char)ch, currentInput);
+    if (ch >= 32 && ch <= 126) {
+        needsRefresh = true;
+    }
+}
+
+// Main key input handler
+void handleKeyInput(int ch, std::string& currentInput, int userId, int otherUserId, bool& chatting) {
+    if (ch == 9) {
+        handleTabKey();
+        return;
+    }
+    
+    if (isInButtonArea) {
+        handleButtonAreaKeys(ch, userId, otherUserId, chatting);
+    } else {
+        handleChatAreaKeys(ch, currentInput, userId, otherUserId, chatting);
+    }
+}
+
+// Drawing functions
+void drawButtonArea() {
+    if (!buttonWindow) return;
+    
+    wclear(buttonWindow);
+    
+    int max_x = getmaxx(buttonWindow);
+    
+    mvwprintw(buttonWindow, 2, 0, "%s", std::string(max_x, '-').c_str());
+    
+    int button_spacing = max_x / 4;
+    std::vector<std::string> button_texts = {"EXIT", "FRIENDS", "INVITE"};
+    
+    // Check for new messages (this will update the global cache if needed)
+    bool hasNewMessages = false;
+    if (currentChatUserId > 0) {
+        hasNewMessages = hasNewMessagesFromAnyFriend(currentChatUserId);
+    }
+    
+    for (int i = 0; i < 3; i++) {
+        int button_x = button_spacing * (i + 1) - button_texts[i].length() / 2 - 1;
+        
+        // Determine color for the button
+        int colorPair = 8; // Default inactive color
+        
+        if (i == selectedButton && isInButtonArea) {
+            colorPair = 7; // Active button (selected)
+        } else if (i == 1 && hasNewMessages) { // FRIENDS button
+            colorPair = 5; // Red color for new messages (COLOR_PAIR(5) is red)
+        }
+        
+        if (has_colors()) {
+            wattron(buttonWindow, COLOR_PAIR(colorPair));
+        }
+        
+        std::string button_display = "[ " + button_texts[i] + " ]";
+        
+        // Add visual indicator for new messages
+        if (i == 1 && hasNewMessages) {
+            button_display = "[ " + button_texts[i] + " (!) ]";
+        }
+        
+        mvwprintw(buttonWindow, 1, button_x, "%s", button_display.c_str());
+        
+        if (has_colors()) {
+            wattroff(buttonWindow, COLOR_PAIR(colorPair));
+        }
+    }
+    
+    if (isInButtonArea) {
+        if (has_colors()) {
+            wattron(buttonWindow, COLOR_PAIR(6));
+        }
+        std::string instruction = "LEFT/RIGHT: Navigate buttons | ENTER: Select | TAB: Switch to chat";
+        int instr_x = (max_x - instruction.length()) / 2;
+        mvwprintw(buttonWindow, 0, instr_x, "%s", instruction.c_str());
+        if (has_colors()) {
+            wattroff(buttonWindow, COLOR_PAIR(6));
+        }
+    }
+    
+    wrefresh(buttonWindow);
 }
 
 void drawChatHeader(const std::string& otherUserName) {
@@ -96,106 +429,84 @@ void drawChatHeader(const std::string& otherUserName) {
         wattroff(headerWindow, COLOR_PAIR(1));
     }
     
-    // Instructions
-    if (has_colors()) {
-        wattron(headerWindow, COLOR_PAIR(6));
+    if (!isInButtonArea) {
+        if (has_colors()) {
+            wattron(headerWindow, COLOR_PAIR(6));
+        }
+        
+        std::string instructions = "Type message and press ENTER | UP/DOWN to scroll | TAB for buttons";
+        int instr_x = (max_x - instructions.length()) / 2;
+        mvwprintw(headerWindow, 1, instr_x, "%s", instructions.c_str());
+        
+        if (has_colors()) {
+            wattroff(headerWindow, COLOR_PAIR(6));
+        }
     }
     
-    std::string instructions = "Type message and press ENTER | UP/DOWN to scroll | /exit or ESC to quit";
-    int instr_x = (max_x - instructions.length()) / 2;
-    mvwprintw(headerWindow, 1, instr_x, "%s", instructions.c_str());
-    
-    if (has_colors()) {
-        wattroff(headerWindow, COLOR_PAIR(6));
-    }
-    
-    // Draw separator line
     mvwprintw(headerWindow, 2, 0, "%s", std::string(max_x, '-').c_str());
     
     wrefresh(headerWindow);
 }
 
-void drawChatHistory(int userId) {
-    if (!chatWindow) return;
-    
-    std::lock_guard<std::mutex> lock(chatMutex);
-    
-    wclear(chatWindow);
-    
-    if (globalChatHistory.empty()) {
-        if (has_colors()) {
-            wattron(chatWindow, COLOR_PAIR(4));
-        }
-        mvwprintw(chatWindow, 0, 2, "No messages yet. Start typing to begin the conversation!");
-        if (has_colors()) {
-            wattroff(chatWindow, COLOR_PAIR(4));
-        }
-        wrefresh(chatWindow);
-        return;
+void drawEmptyChat() {
+    if (has_colors()) {
+        wattron(chatWindow, COLOR_PAIR(4));
     }
+    mvwprintw(chatWindow, 0, 2, "No messages yet. Start typing to begin the conversation!");
+    if (has_colors()) {
+        wattroff(chatWindow, COLOR_PAIR(4));
+    }
+    wrefresh(chatWindow);
+}
+
+void calculateMessageRange(int totalMessages, int max_y, int& startIndex, int& endIndex) {
+    int visibleMessages = max_y - 1;
     
-    int max_y = getmaxy(chatWindow);
-    int max_x = getmaxx(chatWindow);
-    
-    // Calculate which messages to display based on scroll position
-    int totalMessages = globalChatHistory.size();
-    int visibleMessages = max_y - 1; // Leave one line for padding
-    
-    // Ensure scroll position is within bounds
     scrollPosition = std::max(0, std::min(scrollPosition, std::max(0, totalMessages - visibleMessages)));
     
-    // Check if user scrolled to the top and we need to load more messages
     if (scrollPosition >= totalMessages - visibleMessages && hasMoreOlderMessages && !isLoadingOlderMessages) {
         isLoadingOlderMessages = true;
-        // This will be handled in the main loop
     }
     
-    // Calculate the range of messages to display
-    int endIndex = totalMessages - scrollPosition;
-    int startIndex = std::max(0, endIndex - visibleMessages);
+    endIndex = totalMessages - scrollPosition;
+    startIndex = std::max(0, endIndex - visibleMessages);
     
-    // Ensure we don't go beyond bounds
     endIndex = std::min(totalMessages, endIndex);
     startIndex = std::max(0, startIndex);
+}
+
+void drawMessage(const Message& msg, int userId, int line, int max_x) {
+    std::string displayLine;
+    std::string timeStr = msg.timestamp.length() >= 19 ? msg.timestamp.substr(11, 8) : msg.timestamp;
     
-    int line = 0;
-    for (int i = startIndex; i < endIndex && line < max_y - 1; i++) {
-        const Message& msg = globalChatHistory[i];
-        
-        std::string displayLine;
-        std::string timeStr = msg.timestamp.length() >= 19 ? msg.timestamp.substr(11, 8) : msg.timestamp;
-        
-        if (msg.senderId == userId) {
-            if (has_colors()) {
-                wattron(chatWindow, COLOR_PAIR(2));
-            }
-            displayLine = "[" + timeStr + "] " + currentUserDisplay + ": " + msg.content;
-        } else {
-            if (has_colors()) {
-                wattron(chatWindow, COLOR_PAIR(3));
-            }
-            displayLine = "[" + timeStr + "] " + otherUserDisplay + ": " + msg.content;
-        }
-        
-        // Word wrap if message is too long
-        if (displayLine.length() > max_x - 2) {
-            displayLine = displayLine.substr(0, max_x - 5) + "...";
-        }
-        
-        mvwprintw(chatWindow, line, 1, "%s", displayLine.c_str());
-        
+    if (msg.senderId == userId) {
         if (has_colors()) {
-            if (msg.senderId == userId) {
-                wattroff(chatWindow, COLOR_PAIR(2));
-            } else {
-                wattroff(chatWindow, COLOR_PAIR(3));
-            }
+            wattron(chatWindow, COLOR_PAIR(2));
         }
-        
-        line++;
+        displayLine = "[" + timeStr + "] " + currentUserDisplay + ": " + msg.content;
+    } else {
+        if (has_colors()) {
+            wattron(chatWindow, COLOR_PAIR(3));
+        }
+        displayLine = "[" + timeStr + "] " + otherUserDisplay + ": " + msg.content;
     }
     
-    // Show loading indicator if loading older messages
+    if (displayLine.length() > max_x - 2) {
+        displayLine = displayLine.substr(0, max_x - 5) + "...";
+    }
+    
+    mvwprintw(chatWindow, line, 1, "%s", displayLine.c_str());
+    
+    if (has_colors()) {
+        if (msg.senderId == userId) {
+            wattroff(chatWindow, COLOR_PAIR(2));
+        } else {
+            wattroff(chatWindow, COLOR_PAIR(3));
+        }
+    }
+}
+
+void drawScrollIndicators(int max_y, int max_x, int endIndex, int totalMessages) {
     if (isLoadingOlderMessages) {
         if (has_colors()) {
             wattron(chatWindow, COLOR_PAIR(6));
@@ -205,7 +516,6 @@ void drawChatHistory(int userId) {
             wattroff(chatWindow, COLOR_PAIR(6));
         }
     } else {
-        // Show scroll indicator if there are more messages above
         if (scrollPosition > 0 && hasMoreOlderMessages) {
             if (has_colors()) {
                 wattron(chatWindow, COLOR_PAIR(6));
@@ -217,7 +527,6 @@ void drawChatHistory(int userId) {
         }
     }
     
-    // Show scroll indicator if there are more messages below (when scrolled up)
     if (endIndex < totalMessages) {
         if (has_colors()) {
             wattron(chatWindow, COLOR_PAIR(6));
@@ -227,6 +536,36 @@ void drawChatHistory(int userId) {
             wattroff(chatWindow, COLOR_PAIR(6));
         }
     }
+}
+
+void drawChatHistory(int userId) {
+    if (!chatWindow) return;
+    
+    std::lock_guard<std::mutex> lock(chatMutex);
+    
+    wclear(chatWindow);
+    
+    if (globalChatHistory.empty()) {
+        drawEmptyChat();
+        return;
+    }
+    
+    int max_y = getmaxy(chatWindow);
+    int max_x = getmaxx(chatWindow);
+    
+    int totalMessages = globalChatHistory.size();
+    int startIndex, endIndex;
+    
+    calculateMessageRange(totalMessages, max_y, startIndex, endIndex);
+    
+    int line = 0;
+    for (int i = startIndex; i < endIndex && line < max_y - 1; i++) {
+        const Message& msg = globalChatHistory[i];
+        drawMessage(msg, userId, line, max_x);
+        line++;
+    }
+    
+    drawScrollIndicators(max_y, max_x, endIndex, totalMessages);
     
     wrefresh(chatWindow);
 }
@@ -238,14 +577,11 @@ void drawInputArea(const std::string& currentInput) {
     
     int max_x = getmaxx(inputWindow);
     
-    // Draw separator line
     mvwprintw(inputWindow, 0, 0, "%s", std::string(max_x, '-').c_str());
     
-    // Input prompt
     std::string prompt = "Message: ";
     mvwprintw(inputWindow, 1, 1, "%s", prompt.c_str());
     
-    // Current input text
     std::string displayInput = currentInput;
     int maxInputLength = max_x - prompt.length() - 3;
     
@@ -255,11 +591,30 @@ void drawInputArea(const std::string& currentInput) {
     
     mvwprintw(inputWindow, 1, prompt.length() + 1, "%s", displayInput.c_str());
     
-    // Position cursor
-    int cursorPos = std::min((int)displayInput.length(), maxInputLength);
-    wmove(inputWindow, 1, prompt.length() + 1 + cursorPos);
+    if (!isInButtonArea) {
+        int cursorPos = std::min((int)displayInput.length(), maxInputLength);
+        wmove(inputWindow, 1, prompt.length() + 1 + cursorPos);
+    }
     
     wrefresh(inputWindow);
+}
+
+void refreshChatDisplay(int userId, const std::string& currentInput) {
+    drawButtonArea();
+    drawChatHeader(otherUserDisplay);
+    drawChatHistory(userId);
+    drawInputArea(currentInput);
+}
+
+// Message loading functions
+void insertOlderMessages(const std::vector<Message>& olderMessages) {
+    globalChatHistory.insert(globalChatHistory.begin(), olderMessages.begin(), olderMessages.end());
+    totalLoadedMessages += olderMessages.size();
+    scrollPosition += olderMessages.size();
+    
+    if (olderMessages.size() < 50) {
+        hasMoreOlderMessages = false;
+    }
 }
 
 void loadOlderMessages(int userId, int otherUserId) {
@@ -270,62 +625,65 @@ void loadOlderMessages(int userId, int otherUserId) {
     std::lock_guard<std::mutex> lock(chatMutex);
     
     if (!olderMessages.empty()) {
-        // Insert older messages at the beginning
-        globalChatHistory.insert(globalChatHistory.begin(), olderMessages.begin(), olderMessages.end());
-        totalLoadedMessages += olderMessages.size();
-        
-        // Adjust scroll position to maintain user's view
-        scrollPosition += olderMessages.size();
-        
-        if (olderMessages.size() < 50) {
-            hasMoreOlderMessages = false; // No more older messages
-        }
+        insertOlderMessages(olderMessages);
     } else {
-        hasMoreOlderMessages = false; // No more older messages
+        hasMoreOlderMessages = false;
     }
     
     isLoadingOlderMessages = false;
     needsRefresh = true;
 }
 
+bool checkForNewMessages(const std::vector<Message>& latestMessages) {
+    if (latestMessages.size() != globalChatHistory.size()) {
+        return true;
+    }
+    
+    if (!latestMessages.empty() && !globalChatHistory.empty()) {
+        const Message& newLast = latestMessages.back();
+        const Message& oldLast = globalChatHistory.back();
+        
+        if (newLast.content != oldLast.content || 
+            newLast.timestamp != oldLast.timestamp) {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+void updateChatHistory(const std::vector<Message>& latestMessages) {
+    int oldSize = globalChatHistory.size();
+    
+    if (totalLoadedMessages > 50) {
+        globalChatHistory.erase(globalChatHistory.end() - std::min(50, oldSize), globalChatHistory.end());
+        globalChatHistory.insert(globalChatHistory.end(), latestMessages.begin(), latestMessages.end());
+    } else {
+        globalChatHistory = latestMessages;
+        totalLoadedMessages = latestMessages.size();
+    }
+}
+
 void updateRecentMessages(int userId, int otherUserId) {
-    // Only update if we're showing recent messages (not scrolled up too far)
     if (scrollPosition > 5) return;
     
     std::vector<Message> latestMessages = getLatestChatHistory(userId, otherUserId, 50);
     
     std::lock_guard<std::mutex> lock(chatMutex);
     
-    bool hasNewMessages = false;
-    
-    if (latestMessages.size() != globalChatHistory.size()) {
-        hasNewMessages = true;
-    } else if (!latestMessages.empty() && !globalChatHistory.empty()) {
-        // Check if the last message is different
-        const Message& newLast = latestMessages.back();
-        const Message& oldLast = globalChatHistory.back();
-        
-        if (newLast.content != oldLast.content || 
-            newLast.timestamp != oldLast.timestamp) {
-            hasNewMessages = true;
-        }
-    }
+    bool hasNewMessages = checkForNewMessages(latestMessages);
     
     if (hasNewMessages) {
-        // Replace with latest messages only if we're near the bottom
-        int oldSize = globalChatHistory.size();
-        
-        // Keep older messages if we have them
-        if (totalLoadedMessages > 50) {
-            // Remove old recent messages and add new ones
-            globalChatHistory.erase(globalChatHistory.end() - std::min(50, oldSize), globalChatHistory.end());
-            globalChatHistory.insert(globalChatHistory.end(), latestMessages.begin(), latestMessages.end());
-        } else {
-            globalChatHistory = latestMessages;
-            totalLoadedMessages = latestMessages.size();
-        }
-        
+        updateChatHistory(latestMessages);
         needsRefresh = true;
+    }
+}
+
+void processMessageUpdates(int userId, int otherUserId) {
+    if (isLoadingOlderMessages && hasMoreOlderMessages) {
+        loadOlderMessages(userId, otherUserId);
+    } else {
+        updateRecentMessages(userId, otherUserId);
     }
 }
 
@@ -333,132 +691,51 @@ void receiveMessages(int userId, int otherUserId, bool& chatting) {
     while (chatting) {
         try {
             std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-
-            // Check if we need to load older messages
-            if (isLoadingOlderMessages && hasMoreOlderMessages) {
-                loadOlderMessages(userId, otherUserId);
-            } else {
-                // Regular update - get latest messages
-                updateRecentMessages(userId, otherUserId);
+            processMessageUpdates(userId, otherUserId);
+            
+            // Also check for friend messages and trigger refresh if needed
+            static bool lastFriendMessageState = false;
+            bool currentFriendMessageState = hasNewMessagesFromAnyFriend(userId);
+            
+            if (currentFriendMessageState != lastFriendMessageState) {
+                needsRefresh = true;
+                lastFriendMessageState = currentFriendMessageState;
             }
-
+            
         } catch (const std::exception& e) {
-            // Handle error silently
             isLoadingOlderMessages = false;
         }
     }
 }
 
-void handleScrollUp() {
-    scrollPosition++;
-    if (scrollPosition >= (int)globalChatHistory.size() - 10 && hasMoreOlderMessages && !isLoadingOlderMessages) {
-        isLoadingOlderMessages = true;
-    }
-}
-
-void handleScrollDown() {
-    scrollPosition = std::max(0, scrollPosition - 1);
-}
-
-void handleEnterKey(const std::string& currentInput, std::string& inputBuffer, int userId, int otherUserId, bool& chatting) {
-    if (currentInput.empty()) return;
-    
-    if (currentInput[0] == '/') {
-        processCommand(currentInput, userId, otherUserId, inputBuffer, chatting, needsRefresh);
-    } else {
-        if (sendMessage(userId, otherUserId, currentInput)) {
-            inputBuffer = "";
-            scrollPosition = 0;
-            {
-                std::lock_guard<std::mutex> lock(chatMutex);
-                globalChatHistory = getLatestChatHistory(userId, otherUserId, 50);
-                totalLoadedMessages = std::max(totalLoadedMessages, (int)globalChatHistory.size());
-            }
-            needsRefresh = true;
-        }
-    }
-}
-
-void handleBackspace(std::string& currentInput) {
-    if (!currentInput.empty()) {
-        currentInput.pop_back();
-    }
-}
-
-void handleRegularCharacter(char ch, std::string& currentInput) {
-    if (ch >= 32 && ch <= 126) {
-        currentInput += ch;
-    }
-}
-
-void refreshChatDisplay(int userId, const std::string& currentInput) {
-    drawChatHeader(otherUserDisplay);
-    drawChatHistory(userId);
-    drawInputArea(currentInput);
-}
-
-void handleKeyInput(int ch, std::string& currentInput, int userId, int otherUserId, bool& chatting) {
-    switch (ch) {
-        case KEY_UP:
-            handleScrollUp();
-            refreshChatDisplay(userId, currentInput);
-            break;
-            
-        case KEY_DOWN:
-            handleScrollDown();
-            refreshChatDisplay(userId, currentInput);
-            break;
-            
-        case 10: // ENTER
-        case 13: // ENTER
-            handleEnterKey(currentInput, currentInput, userId, otherUserId, chatting);
-            drawInputArea(currentInput);
-            break;
-            
-        case KEY_BACKSPACE:
-        case 127:
-        case 8:
-            handleBackspace(currentInput);
-            drawInputArea(currentInput);
-            break;
-            
-        case 27: // ESC
-            chatting = false;
-            break;
-            
-        default:
-            handleRegularCharacter((char)ch, currentInput);
-            drawInputArea(currentInput);
-            break;
-    }
-}
-
-void initializeChatSession(int userId, int otherUserId) {
-    // Reset pagination variables
+// Initialization functions
+void initializeChatVariables() {
     totalLoadedMessages = 0;
     isLoadingOlderMessages = false;
     hasMoreOlderMessages = true;
     scrollPosition = 0;
+}
+
+void loadInitialChatHistory(int userId, int otherUserId) {
+    std::lock_guard<std::mutex> lock(chatMutex);
+    globalChatHistory = getLatestChatHistory(userId, otherUserId, 50);
+    totalLoadedMessages = globalChatHistory.size();
     
-    // Initial load of chat history (most recent 50 messages)
-    {
-        std::lock_guard<std::mutex> lock(chatMutex);
-        globalChatHistory = getLatestChatHistory(userId, otherUserId, 50);
-        totalLoadedMessages = globalChatHistory.size();
-        
-        // If we got less than 50 messages, there are no older messages
-        if (globalChatHistory.size() < 50) {
-            hasMoreOlderMessages = false;
-        }
+    if (globalChatHistory.size() < 50) {
+        hasMoreOlderMessages = false;
     }
 }
 
-void setupUserDisplayNames(const std::string& userName, const std::string& userNameId, 
-                          const std::string& otherUserName, const std::string& otherUserNameId, int otherUserId) {
-    // Set user display names
+void initializeChatSession(int userId, int otherUserId) {
+    initializeChatVariables();
+    loadInitialChatHistory(userId, otherUserId);
+}
+
+void setCurrentUserDisplay(const std::string& userName, const std::string& userNameId) {
     currentUserDisplay = userName + "#" + userNameId;
-    
-    // If other user info is provided, use it; otherwise fetch from database
+}
+
+void setOtherUserDisplay(const std::string& otherUserName, const std::string& otherUserNameId, int otherUserId) {
     if (!otherUserName.empty() && !otherUserNameId.empty()) {
         otherUserDisplay = otherUserName + "#" + otherUserNameId;
     } else {
@@ -467,52 +744,81 @@ void setupUserDisplayNames(const std::string& userName, const std::string& userN
     }
 }
 
+void setupUserDisplayNames(const std::string& userName, const std::string& userNameId, 
+                          const std::string& otherUserName, const std::string& otherUserNameId, int otherUserId) {
+    setCurrentUserDisplay(userName, userNameId);
+    setOtherUserDisplay(otherUserName, otherUserNameId, otherUserId);
+}
+
+void initializeChatState() {
+    isInButtonArea = false;
+    selectedButton = 0;
+}
+
+// Main loop functions
+void processUserInput(int ch, std::string& currentInput, int userId, int otherUserId, bool& chatting) {
+    if (ch != ERR) {
+        handleKeyInput(ch, currentInput, userId, otherUserId, chatting);
+    }
+}
+
+void updateDisplayIfNeeded(int userId, const std::string& currentInput) {
+    if (needsRefresh) {
+        needsRefresh = false;
+        refreshChatDisplay(userId, currentInput);
+    }
+}
+
 void runChatLoop(int userId, int otherUserId, bool& chatting) {
     std::string currentInput = "";
     
-    // Set non-blocking input with timeout
     timeout(500);
     
-    // Main input loop
     while (chatting) {
         int ch = getch();
         
-        if (ch != ERR) {
-            handleKeyInput(ch, currentInput, userId, otherUserId, chatting);
-        }
-        
-        if (needsRefresh) {
-            needsRefresh = false;
-            refreshChatDisplay(userId, currentInput);
-        }
+        processUserInput(ch, currentInput, userId, otherUserId, chatting);
+        updateDisplayIfNeeded(userId, currentInput);
     }
     
     timeout(-1);
 }
 
+void startMessageReceiver(int userId, int otherUserId, bool& chatting, std::thread& receiverThread) {
+    receiverThread = std::thread(receiveMessages, userId, otherUserId, std::ref(chatting));
+}
 
+void cleanupChatSession(bool& chatting, std::thread& receiverThread) {
+    chatting = false;
+    receiverThread.join();
+    cleanupChatTerminal();
+}
+
+// Main function
 int showChatTerminal(int userId, int otherUserId, const std::string& userName, const std::string& userNameId, 
                     const std::string& otherUserName, const std::string& otherUserNameId) {
+    // Set the global user ID for button color checking
+    currentChatUserId = userId;
+    
     initializeChatTerminal();
     
     setupUserDisplayNames(userName, userNameId, otherUserName, otherUserNameId, otherUserId);
     initializeChatSession(userId, otherUserId);
     
     bool chatting = true;
+    initializeChatState();
     
-    // Start receiver thread
-    std::thread receiverThread(receiveMessages, userId, otherUserId, std::ref(chatting));
+    std::thread receiverThread;
+    startMessageReceiver(userId, otherUserId, chatting, receiverThread);
     
-    // Initial display
     refreshChatDisplay(userId, "");
     
-    // Run main chat loop
     runChatLoop(userId, otherUserId, chatting);
     
-    // Cleanup
-    chatting = false;
-    receiverThread.join();
-    cleanupChatTerminal();
+    cleanupChatSession(chatting, receiverThread);
+    
+    // Reset the global user ID when leaving chat
+    currentChatUserId = 0;
     
     return 0;
 }
